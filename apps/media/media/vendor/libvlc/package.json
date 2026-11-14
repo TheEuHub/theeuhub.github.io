@@ -1,0 +1,66 @@
+{
+  "name": "libvlc-wasm",
+  "version": "0.2.0",
+  "description": "VLC's playback engine (libvlc 4) compiled to WebAssembly: plays the formats browsers can't.",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./element": {
+      "types": "./src/element.d.ts",
+      "default": "./src/element.js"
+    },
+    "./node": {
+      "types": "./src/node.d.ts",
+      "default": "./src/node.js"
+    },
+    "./vite": {
+      "types": "./src/vite.d.ts",
+      "default": "./src/vite.js"
+    },
+    "./coi-serviceworker.js": "./src/coi-serviceworker.js",
+    "./wasm/libvlc.wasm": "./wasm/libvlc.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "wasm/libvlc.js",
+    "wasm/libvlc.wasm",
+    "wasm/VLC_COMMIT",
+    "fonts",
+    "README.md",
+    "LICENSE",
+    "COPYING"
+  ],
+  "sideEffects": [
+    "./src/element.js"
+  ],
+  "license": "MIT AND GPL-2.0-or-later",
+  "keywords": [
+    "vlc",
+    "libvlc",
+    "wasm",
+    "webassembly",
+    "video",
+    "player",
+    "codec",
+    "emscripten"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasgelfond/libvlc-wasm.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/lucasgelfond/libvlc-wasm#readme",
+  "bugs": {
+    "url": "https://github.com/lucasgelfond/libvlc-wasm/issues"
+  }
+}

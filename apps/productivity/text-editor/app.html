@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Editor - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Text Editor</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: text-editor — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ TEXT EDITOR ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body, options = {}) {
+    let currentPath = '';
+    let readOnlyFile = false;
+    let dirty = false;
+    let savedText = '';
+
+    body.innerHTML = `${bar('Text Editor', `
+      <button type="button" class="btn sm" id="te-open">${iconSvg('folder-open')} Open…</button>
+      <button type="button" class="btn sm primary" id="te-save">${iconSvg('save')} Save</button>
+      <button type="button" class="btn sm" id="te-copy">${iconSvg('copy')} Save a copy…</button>
+      <input type="file" id="te-file" hidden>
+    `)}
+    <div id="te-note" class="muted" style="padding:6px 12px;border-bottom:1px solid var(--line);background:#0c0c0c">Untitled document</div>
+    <div id="te-ask" hidden style="display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:#151515">
+      <span style="font-size:13px">Destination path:</span>
+      <input type="text" id="te-ask-path" style="flex:1;padding:5px 8px">
+      <button type="button" class="btn sm primary" id="te-ask-ok">Save copy</button>
+      <button type="button" class="btn sm" id="te-ask-cancel">Cancel</button>
+    </div>
+    <textarea id="te-text" spellcheck="false" style="flex:1;min-height:0;border:0;border-radius:0;padding:12px 14px;resize:none;font:13.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"></textarea>
+    <div id="te-status" class="muted" style="padding:5px 12px;border-top:1px solid var(--line);background:#0c0c0c;font-size:12px">Ready</div>`;
+
+    const textEl = body.querySelector('#te-text');
+    const saveBtn = body.querySelector('#te-save');
+    const copyBtn = body.querySelector('#te-copy');
+    const noteEl = body.querySelector('#te-note');
+    const statusEl = body.querySelector('#te-status');
+    const fileInput = body.querySelector('#te-file');
+    const askBox = body.querySelector('#te-ask');
+    const askPath = body.querySelector('#te-ask-path');
+    askBox.style.display = 'none';
+
+    const updateStatus = () => {
+      const len = textEl.value.length;
+      const lines = textEl.value ? textEl.value.split('\n').length : 1;
+      const state = dirty ? 'unsaved changes' : (currentPath ? 'saved' : 'new');
+      statusEl.textContent = `${state} · ${lines} line${lines === 1 ? '' : 's'}, ${len} chars`;
+    };
+
+    const refreshHeader = () => {
+      if (!currentPath) {
+        noteEl.textContent = 'Untitled document (save to your proton home folder or your computer)';
+        saveBtn.disabled = false;
+      } else if (readOnlyFile) {
+        noteEl.textContent = `${currentPath} — read-only proton system file (editing as a draft; use Save a copy to keep changes)`;
+        saveBtn.disabled = true;
+      } else {
+        noteEl.textContent = `${currentPath} — proton home folder`;
+        saveBtn.disabled = false;
+      }
+      updateStatus();
+    };
+
+    const loadPath = async (p) => {
+      const norm = FS.normalize(p);
+      try {
+        const content = await FS.read(norm);
+        if (!body.isConnected) return;
+        currentPath = norm;
+        readOnlyFile = !FS.isWritable(norm);
+        savedText = content;
+        textEl.value = content;
+        textEl.readOnly = false;
+        dirty = false;
+        refreshHeader();
+      } catch (err) {
+        MH.toast(err?.message || `Could not open ${norm}.`);
+      }
+    };
+
+    const saveCurrent = async () => {
+      if (readOnlyFile) return;
+      const dest = await MH.askFileSource('save');
+      if (!dest) return;
+      if (dest === 'device') {
+        const name = currentPath ? FS.basename(currentPath) : 'untitled.txt';
+        MH.download(name, textEl.value, 'text/plain;charset=utf-8');
+        dirty = false;
+        savedText = textEl.value;
+        updateStatus();
+        return;
+      }
+      let target = currentPath;
+      if (!target || !FS.isWritable(target)) {
+        target = await MH.vfsPick({ title: 'Save file to proton', save: true, name: target ? FS.basename(target) : 'untitled.txt' });
+      }
+      if (!target) return;
+      FS.write(target, textEl.value);
+      currentPath = target;
+      readOnlyFile = false;
+      savedText = textEl.value;
+      dirty = false;
+      refreshHeader();
+      MH.toast(`Saved ${FS.basename(target)}`);
+    };
+
+    const saveCopy = async () => {
+      const base = currentPath ? FS.basename(currentPath) : 'untitled.txt';
+      const suggested = FS.join(FS.home(), base);
+      noteEl.textContent = `Save a copy to ${suggested} or download to this computer`;
+      const dest = await MH.askFileSource('save');
+      if (!dest) { refreshHeader(); return; }
+      if (dest === 'device') {
+        MH.download(base, textEl.value, 'text/plain;charset=utf-8');
+        refreshHeader();
+        return;
+      }
+      askPath.value = suggested;
+      askBox.hidden = false;
+      askBox.style.display = 'flex';
+      askPath.focus();
+    };
+
+    body.querySelector('#te-ask-cancel').onclick = () => {
+      askBox.hidden = true;
+      askBox.style.display = 'none';
+      refreshHeader();
+    };
+    body.querySelector('#te-ask-ok').onclick = () => {
+      const target = FS.normalize(askPath.value.trim() || FS.join(FS.home(), 'untitled.txt'));
+      FS.write(target, textEl.value);
+      askBox.hidden = true;
+      askBox.style.display = 'none';
+      currentPath = target;
+      readOnlyFile = !FS.isWritable(target);
+      savedText = textEl.value;
+      dirty = false;
+      refreshHeader();
+      MH.toast(`Saved ${FS.basename(target)}`);
+    };
+
+    body.querySelector('#te-open').onclick = () => {
+      MH.askFileSource('open').then((src) => {
+        if (src === 'device') fileInput.click();
+        else if (src === 'vfs') {
+          MH.vfsPick({ title: 'Open text file from proton' }).then((p) => { if (p) loadPath(p); });
+        }
+      });
+    };
+
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      textEl.value = await file.text();
+      currentPath = '';
+      readOnlyFile = false;
+      savedText = textEl.value;
+      dirty = false;
+      noteEl.textContent = `${file.name} (opened from this computer)`;
+      saveBtn.disabled = false;
+      updateStatus();
+      fileInput.value = '';
+    };
+
+    saveBtn.onclick = saveCurrent;
+    copyBtn.onclick = saveCopy;
+
+    textEl.addEventListener('input', () => {
+      dirty = textEl.value !== savedText;
+      updateStatus();
+    });
+    textEl.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (!readOnlyFile) saveCurrent();
+        else saveCopy();
+      }
+    });
+
+    body.beforeClose = () => {
+      if (dirty && !window.confirm('Discard unsaved text changes?')) return false;
+      return true;
+    };
+    body.openPath = (opts = {}) => {
+      if (opts.path) loadPath(opts.path);
+    };
+
+    refreshHeader();
+    if (options.path) loadPath(options.path);
+  },
+});
+</script>
+</body>
+</html>

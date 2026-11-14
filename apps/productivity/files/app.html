@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Files - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Files</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: files — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ FILES ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body, options = {}) {
+    if (!document.getElementById('proton-files-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-files-css';
+      st.textContent = `
+        .fm-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+        .fm-pathbar{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--line);background:#0c0c0c;flex-wrap:wrap}
+        .fm-crumbs{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+        .fm-crumb{border:1px solid #333;background:#161616;color:#fff;border-radius:5px;padding:3px 8px;font-size:12px}
+        .fm-crumb:hover{background:#252525}
+        .fm-side{padding:10px;display:flex;flex-direction:column;gap:4px}
+        .fm-side h4{margin:10px 6px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+        .fm-side h4:first-child{margin-top:2px}
+        .fm-side button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;color:#fff;padding:7px 8px;border-radius:6px;text-align:left;font-size:13px}
+        .fm-side button:hover,.fm-side button.on{background:#222}
+        .fm-main{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+        .fm-scroll{flex:1;overflow:auto;padding:8px 12px}
+        .fm-list{display:flex;flex-direction:column}
+        .fm-row{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid #222;background:transparent;color:#fff;padding:8px 10px;border-radius:6px;text-align:left}
+        .fm-row:hover{background:#191919}
+        .fm-row.sel,.fm-tile.sel{background:var(--accent-soft);outline:1px solid var(--accent)}
+        .fm-row .fm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .fm-row .fm-meta{font-size:12px;color:var(--muted);white-space:nowrap}
+        .fm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;padding:6px 0}
+        .fm-tile{border:1px solid #2a2a2a;background:#101010;color:#fff;border-radius:8px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}
+        .fm-tile:hover{background:#1b1b1b}
+        .fm-tile .icn{width:28px;height:28px}
+        .fm-tile .fm-name{width:100%;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .fm-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:#151515}
+        .fm-ask[hidden]{display:none}
+        .fm-status{padding:6px 12px;border-top:1px solid var(--line);background:#0c0c0c;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+        .fm-menu{position:fixed;z-index:9900;min-width:190px;background:#141414;border:1px solid #444;border-radius:8px;padding:4px;box-shadow:0 12px 32px rgba(0,0,0,.7);display:flex;flex-direction:column}
+        .fm-menu button{border:0;background:transparent;color:#fff;padding:7px 10px;text-align:left;border-radius:5px;font-size:13px}
+        .fm-menu button:hover{background:#282828}
+        .fm-menu button:disabled{opacity:.45;cursor:default}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const home = FS.home();
+    let cwd = home;
+    let viewMode = 'list';
+    let selected = new Set();
+    let searchQuery = '';
+    let searchHits = null;
+    let askState = null;
+
+    body.innerHTML = `${bar('Files', `
+      <button type="button" class="btn sm" id="fm-up" title="Up">${iconSvg('chevron-left')} Up</button>
+      <input type="text" id="fm-path" style="flex:1;min-width:150px" aria-label="Current folder path">
+      <input type="search" id="fm-search" placeholder="Search all files..." style="width:150px">
+      <button type="button" class="btn sm" id="fm-clear" hidden>Clear</button>
+      <input type="search" id="fm-filter" placeholder="Filter folder..." style="width:120px">
+      <button type="button" class="btn sm" id="fm-new-folder">${iconSvg('folder')} New folder</button>
+      <button type="button" class="btn sm" id="fm-new-file">${iconSvg('file-text')} New file</button>
+      <button type="button" class="btn sm" id="fm-import">${iconSvg('upload')} Import</button>
+      <button type="button" class="btn sm" id="fm-download">${iconSvg('download')} Download</button>
+      <button type="button" class="btn sm" id="fm-view">${iconSvg('grid')}</button>
+      <input type="file" id="fm-file" hidden multiple>
+    `)}
+    <div class="split">
+      <aside class="side fm-side" id="fm-side">
+        <h4>Places</h4>
+        <button type="button" data-go="${MH.esc(home)}">${iconSvg('home')} Home</button>
+        <button type="button" data-go="${MH.esc(FS.join(home, 'Desktop'))}">${iconSvg('monitor')} Desktop</button>
+        <button type="button" data-go="${MH.esc(FS.join(home, 'Documents'))}">${iconSvg('folder')} Documents</button>
+        <button type="button" data-go="${MH.esc(FS.join(home, 'Downloads'))}">${iconSvg('download')} Downloads</button>
+        <button type="button" data-go="${MH.esc(FS.join(home, 'Pictures'))}">${iconSvg('image')} Pictures</button>
+        <h4>System (read-only)</h4>
+        <button type="button" data-go="/apps">${iconSvg('grid')} /apps</button>
+        <button type="button" data-go="/assets">${iconSvg('layers')} /assets</button>
+        <button type="button" data-go="/data">${iconSvg('database')} /data</button>
+        <button type="button" data-go="/">${iconSvg('folder-open')} /</button>
+      </aside>
+      <div class="fm-main">
+        <div class="fm-pathbar">
+          <div class="fm-crumbs" id="fm-crumbs"></div>
+        </div>
+        <div class="fm-ask" id="fm-ask" hidden>
+          <span id="fm-ask-label" style="font-size:13px;font-weight:600"></span>
+          <input type="text" id="fm-ask-input" style="flex:1;min-width:180px;padding:5px 8px">
+          <div id="fm-ask-folders" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+          <button type="button" class="btn sm primary" data-ok>OK</button>
+          <button type="button" class="btn sm" data-cancel>Cancel</button>
+        </div>
+        <div class="fm-scroll" id="fm-scroll"></div>
+        <div class="fm-status" id="fm-status"></div>
+      </div>
+    </div>`;
+
+    const pathInput = body.querySelector('#fm-path');
+    const crumbsEl = body.querySelector('#fm-crumbs');
+    const scrollEl = body.querySelector('#fm-scroll');
+    const statusEl = body.querySelector('#fm-status');
+    const searchEl = body.querySelector('#fm-search');
+    const clearBtn = body.querySelector('#fm-clear');
+    const filterEl = body.querySelector('#fm-filter');
+    const newFolderBtn = body.querySelector('#fm-new-folder');
+    const newFileBtn = body.querySelector('#fm-new-file');
+    const importBtn = body.querySelector('#fm-import');
+    const fileInput = body.querySelector('#fm-file');
+    const askBox = body.querySelector('#fm-ask');
+    const askLabel = body.querySelector('#fm-ask-label');
+    const askInput = body.querySelector('#fm-ask-input');
+    const askFolders = body.querySelector('#fm-ask-folders');
+
+    const closeMenu = () => body.querySelector('#fm-menu')?.remove();
+
+    const listDirsFor = (rootDir) => {
+      const out = [rootDir];
+      const walk = (d, depth) => {
+        if (depth > 3) return;
+        for (const entry of FS.list(d)) {
+          if (entry.type === 'dir') {
+            out.push(entry.path);
+            walk(entry.path, depth + 1);
+          }
+        }
+      };
+      walk(rootDir, 0);
+      return out;
+    };
+
+    const showAsk = (label, defaultValue, onOk, showFolderList = false) => {
+      askState = onOk;
+      askLabel.textContent = label;
+      askInput.value = defaultValue || '';
+      askFolders.innerHTML = '';
+      if (showFolderList) {
+        const dirs = listDirsFor(home);
+        for (const d of dirs.slice(0, 8)) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn sm';
+          b.textContent = d === home ? 'Home' : FS.basename(d);
+          b.onclick = () => { askInput.value = d; askInput.focus(); };
+          askFolders.appendChild(b);
+        }
+      }
+      askBox.hidden = false;
+      askInput.focus();
+    };
+
+    const hideAsk = () => {
+      askState = null;
+      askBox.hidden = true;
+      askFolders.innerHTML = '';
+    };
+
+    body.querySelector('#fm-ask [data-cancel]').onclick = hideAsk;
+    body.querySelector('#fm-ask [data-ok]').onclick = async () => {
+      const fn = askState;
+      const val = askInput.value.trim();
+      hideAsk();
+      if (fn && val) await fn(val);
+    };
+    askInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); body.querySelector('#fm-ask [data-ok]').click(); }
+      else if (e.key === 'Escape') { e.preventDefault(); hideAsk(); }
+    });
+
+    const appLabelFor = (p) => {
+      const st = FS.stat(p);
+      if (!st) return 'Open';
+      if (st.type === 'dir') return 'Open folder';
+      const id = FS.appFor(p);
+      return id && APPS[id] ? `Open in ${APPS[id].name}` : 'Open';
+    };
+
+    const renderCrumbs = () => {
+      crumbsEl.innerHTML = '';
+      const parts = cwd.split('/').filter(Boolean);
+      const makeBtn = (label, target) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'fm-crumb';
+        b.textContent = label;
+        b.onclick = () => navigate(target);
+        crumbsEl.appendChild(b);
+      };
+      makeBtn('/', '/');
+      let acc = '';
+      for (const part of parts) {
+        acc += '/' + part;
+        const target = acc;
+        makeBtn(part, target);
+      }
+    };
+
+    const render = () => {
+      closeMenu();
+      pathInput.value = cwd;
+      const writable = FS.isWritable(cwd);
+      newFolderBtn.disabled = !writable;
+      newFileBtn.disabled = !writable;
+      importBtn.disabled = !writable;
+      renderCrumbs();
+
+      body.querySelectorAll('#fm-side [data-go]').forEach((b) => {
+        b.classList.toggle('on', b.dataset.go === cwd);
+      });
+
+      const filter = filterEl.value.trim().toLowerCase();
+      let items;
+      if (searchHits !== null) {
+        items = searchHits;
+      } else {
+        items = FS.list(cwd);
+        if (filter) items = items.filter((it) => it.name.toLowerCase().includes(filter));
+      }
+
+      const container = document.createElement('div');
+      container.className = viewMode === 'grid' ? 'fm-grid' : 'fm-list';
+      if (!items.length) {
+        container.innerHTML = `<p class="muted pad">${searchHits !== null ? `No files match "${MH.esc(searchQuery)}".` : 'This folder is empty.'}</p>`;
+      } else {
+        for (const item of items) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = (viewMode === 'grid' ? 'fm-tile' : 'fm-row') + (selected.has(item.path) ? ' sel' : '');
+          btn.dataset.path = item.path;
+          btn.draggable = true;
+          const icName = item.type === 'dir' ? 'folder' : (FS.mediaKind?.(item.path) === 'image' ? 'image' : FS.ext(item.path) === '.pdf' ? 'book' : 'file-text');
+          const sizeLabel = item.type === 'dir' ? 'Folder' : MH.bytes(item.size || 0);
+          btn.innerHTML = viewMode === 'grid'
+            ? `${iconSvg(icName)}<span class="fm-name">${MH.esc(item.name)}</span><span class="muted" style="font-size:11px">${MH.esc(sizeLabel)}</span>`
+            : `${iconSvg(icName)}<span class="fm-name">${MH.esc(searchHits !== null ? item.path : item.name)}</span><span class="fm-meta">${MH.esc(sizeLabel)}</span>`;
+          btn.addEventListener('dragstart', (e) => {
+            e.dataTransfer?.setData('application/x-proton-path', item.path);
+            e.dataTransfer?.setData('text/plain', item.path);
+          });
+          btn.addEventListener('click', (e) => {
+            closeMenu();
+            if (e.ctrlKey || e.metaKey || e.shiftKey) {
+              if (selected.has(item.path)) selected.delete(item.path);
+              else selected.add(item.path);
+              render();
+              return;
+            }
+            if (item.type === 'dir') {
+              searchHits = null;
+              searchQuery = '';
+              clearBtn.hidden = true;
+              navigate(item.path);
+            } else {
+              openFSItem(item.path);
+            }
+          });
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!selected.has(item.path)) {
+              selected = new Set([item.path]);
+              render();
+            }
+            openContextMenu(item, e.clientX, e.clientY);
+          });
+          container.appendChild(btn);
+        }
+      }
+      scrollEl.innerHTML = '';
+      scrollEl.appendChild(container);
+
+      const counts = FS.homeStats();
+      const parts = [];
+      if (selected.size) parts.push(`Selected ${selected.size}`);
+      if (!writable) parts.push('read-only');
+      if (searchHits !== null) parts.push(`${items.length} search match${items.length === 1 ? '' : 'es'}`);
+      else parts.push(`${items.length} item${items.length === 1 ? '' : 's'}`);
+      parts.push(`Your home: ${counts.files} files, ${counts.dirs} folders`);
+      statusEl.textContent = parts.join(' · ');
+    };
+
+    const navigate = (targetPath, selectPath = null) => {
+      const norm = FS.normalize(targetPath);
+      const st = FS.stat(norm);
+      if (!st) { MH.toast(`Folder not found: ${norm}`); return; }
+      if (st.type !== 'dir') {
+        cwd = FS.dirname(norm);
+        selected = new Set([norm]);
+      } else {
+        cwd = st.path;
+        selected = selectPath ? new Set([FS.normalize(selectPath)]) : new Set();
+      }
+      searchHits = null;
+      searchQuery = '';
+      clearBtn.hidden = true;
+      hideAsk();
+      render();
+    };
+
+    const downloadPaths = async (paths) => {
+      if (!paths.length) paths = [cwd];
+      const dest = await MH.askFileSource('save');
+      if (!dest) return;
+      if (dest === 'vfs') {
+        const targetDir = await MH.vfsPick({ title: 'Copy selection into folder', folder: true, save: true });
+        if (!targetDir) return;
+        for (const p of paths) await FS.copy(p, FS.join(targetDir, FS.basename(p)));
+        MH.toast('Copied inside the proton file system.');
+        return;
+      }
+      if (paths.length === 1 && FS.stat(paths[0])?.type === 'file') {
+        const blob = await FS.readBlob(paths[0]);
+        MH.downloadBlob(FS.basename(paths[0]), blob);
+        return;
+      }
+      const archive = await FS_ARCHIVE.zip(paths);
+      const zipName = paths.length === 1 ? `${FS.basename(paths[0])}.zip` : 'proton-files.zip';
+      MH.downloadBlob(zipName, archive);
+    };
+
+    const openContextMenu = (item, x, y) => {
+      closeMenu();
+      const menu = document.createElement('div');
+      menu.id = 'fm-menu';
+      menu.className = 'fm-menu';
+      menu.style.left = `${Math.max(6, Math.min(window.innerWidth - 205, x))}px`;
+      menu.style.top = `${Math.max(6, Math.min(window.innerHeight - 240, y))}px`;
+
+      const wItem = FS.isWritable(item.path);
+      const addBtn = (label, fn, disabled = false) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = label;
+        b.disabled = disabled;
+        b.onclick = async () => { closeMenu(); await fn(); };
+        menu.appendChild(b);
+      };
+
+      addBtn(appLabelFor(item.path), () => openFSItem(item.path));
+      addBtn('Add desktop shortcut', () => {
+        DesktopIcons.addPath(item.path);
+        MH.toast(`Shortcut added for ${item.name}.`);
+      });
+      addBtn('Rename…', () => {
+        showAsk('Rename to:', item.name, (newName) => {
+          const clean = newName.replace(/\//g, '');
+          if (!clean) return;
+          FS.rename(item.path, FS.join(FS.dirname(item.path), clean));
+        });
+      }, !wItem);
+      addBtn('Move to…', () => {
+        showAsk('Move to folder:', FS.dirname(item.path), async (destDir) => {
+          const dest = FS.join(FS.normalize(destDir), item.name);
+          await FS.move(item.path, dest);
+        }, true);
+      }, !wItem);
+      addBtn('Copy to…', () => {
+        showAsk('Copy to folder:', home, async (destDir) => {
+          const dest = FS.join(FS.normalize(destDir), item.name);
+          await FS.copy(item.path, dest);
+        }, true);
+      });
+      addBtn('Download', () => downloadPaths([item.path]));
+      addBtn('Properties', () => {
+        const st = FS.stat(item.path);
+        MH.toast(`${item.name} · ${st?.type === 'dir' ? 'Folder' : MH.bytes(st?.size || 0)} · ${st?.readonly ? 'read-only' : 'writable'}`);
+      });
+      addBtn('Delete', () => {
+        if (!window.confirm(`Delete "${item.name}"?`)) return;
+        FS.remove(item.path);
+      }, !wItem);
+
+      body.appendChild(menu);
+    };
+
+    body.addEventListener('click', (e) => {
+      if (!e.target.closest('#fm-menu')) closeMenu();
+    });
+
+    body.querySelectorAll('#fm-side [data-go]').forEach((b) => {
+      b.onclick = () => navigate(b.dataset.go);
+    });
+
+    body.querySelector('#fm-up').onclick = () => {
+      if (cwd !== '/') navigate(FS.dirname(cwd));
+    };
+
+    pathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        navigate(pathInput.value);
+      }
+    });
+
+    searchEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = searchEl.value.trim();
+        if (!q) {
+          searchHits = null;
+          searchQuery = '';
+          clearBtn.hidden = true;
+        } else {
+          searchQuery = q;
+          searchHits = FS.find(q, '/');
+          clearBtn.hidden = false;
+        }
+        render();
+      }
+    });
+
+    clearBtn.onclick = () => {
+      searchEl.value = '';
+      searchHits = null;
+      searchQuery = '';
+      clearBtn.hidden = true;
+      render();
+    };
+
+    filterEl.addEventListener('input', () => render());
+
+    newFolderBtn.onclick = () => {
+      showAsk('New folder name:', 'New folder', (name) => {
+        const target = FS.join(cwd, name.replace(/\//g, ''));
+        FS.mkdir(target);
+      });
+    };
+
+    newFileBtn.onclick = () => {
+      showAsk('New file name:', 'untitled.txt', (name) => {
+        const target = FS.join(cwd, name.replace(/\//g, ''));
+        FS.write(target, '');
+        openFSItem(target);
+      });
+    };
+
+    importBtn.onclick = () => {
+      MH.askFileSource('open').then((src) => {
+        if (src === 'device') {
+          fileInput.click();
+        } else if (src === 'vfs') {
+          MH.vfsPick({ title: 'Copy file into current folder' }).then(async (p) => {
+            if (!p) return;
+            await FS.copy(p, FS.join(cwd, FS.basename(p)));
+            MH.toast(`Copied ${FS.basename(p)}.`);
+          });
+        }
+      });
+    };
+
+    fileInput.onchange = async () => {
+      const files = [...(fileInput.files || [])];
+      if (!files.length) return;
+      for (const file of files) {
+        const target = FS.join(cwd, file.name);
+        if (FS.BINARY_EXT?.has(FS.ext(file.name))) {
+          await FS.writeBlob(target, file);
+        } else {
+          const text = await file.text();
+          FS.write(target, text);
+        }
+      }
+      fileInput.value = '';
+      MH.toast(`Imported ${files.length} file${files.length === 1 ? '' : 's'}.`);
+    };
+
+    body.querySelector('#fm-download').onclick = () => downloadPaths([...selected]);
+
+    body.querySelector('#fm-view').onclick = () => {
+      viewMode = viewMode === 'list' ? 'grid' : 'list';
+      body.querySelector('#fm-view').innerHTML = iconSvg(viewMode === 'list' ? 'grid' : 'layers');
+      render();
+    };
+
+    const unwatch = FS.watch(() => {
+      if (!body.isConnected) return;
+      if (cwd !== '/' && !FS.exists(cwd)) cwd = home;
+      if (searchHits !== null && searchQuery) searchHits = FS.find(searchQuery, '/');
+      render();
+    });
+
+    body.openPath = (opts = {}) => {
+      if (opts.path) navigate(opts.path);
+    };
+
+    body.onDestroy = () => {
+      unwatch();
+      closeMenu();
+    };
+
+    if (options.path) navigate(options.path);
+    else render();
+  },
+});
+</script>
+</body>
+</html>

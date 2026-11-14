@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Viewer - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Image Viewer</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: image-viewer — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ IMAGE VIEWER ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body, options = {}) {
+    let currentUrl = '';
+    let currentBlob = null;
+    let currentName = '';
+    let zoom = 0; // 0 = Fit to window
+
+    body.innerHTML = `${bar('Image Viewer', `
+      <button type="button" class="btn sm" id="iv-open">${iconSvg('folder-open')} Open…</button>
+      <button type="button" class="btn sm" id="iv-download" disabled>${iconSvg('download')} Download</button>
+      <button type="button" class="btn sm" id="iv-zoom-out" title="Zoom out (-)">-</button>
+      <button type="button" class="btn sm" id="iv-zoom-in" title="Zoom in (+)">+</button>
+      <button type="button" class="btn sm" id="iv-fit" title="Fit to window (0)">Fit</button>
+      <input type="file" id="iv-file" accept="image/*" hidden>
+    `)}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);background:#0c0c0c;font-size:12.5px">
+      <span id="iv-note" class="muted">No image loaded</span>
+      <span id="iv-status" class="muted">Fit to window</span>
+    </div>
+    <div id="iv-stage" style="flex:1;min-height:0;overflow:auto;display:grid;place-items:center;padding:14px;background:#050505">
+      <img id="iv-img" alt="" style="display:none;max-width:100%;max-height:100%;object-fit:contain;border-radius:4px">
+    </div>`;
+
+    const img = body.querySelector('#iv-img');
+    const note = body.querySelector('#iv-note');
+    const status = body.querySelector('#iv-status');
+    const dlBtn = body.querySelector('#iv-download');
+    const fileInput = body.querySelector('#iv-file');
+
+    const revoke = () => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+        currentUrl = '';
+      }
+    };
+
+    const applyZoom = () => {
+      if (!zoom) {
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.width = '';
+        img.style.transform = '';
+        status.textContent = 'Fit to window';
+      } else {
+        img.style.maxWidth = 'none';
+        img.style.maxHeight = 'none';
+        img.style.transform = '';
+        if (img.naturalWidth) img.style.width = `${Math.round(img.naturalWidth * (zoom / 100))}px`;
+        status.textContent = `${zoom}%`;
+      }
+    };
+
+    const zoomBy = (delta) => {
+      if (!currentUrl) return;
+      if (!zoom) zoom = delta > 0 ? 125 : 75;
+      else zoom = Math.max(25, Math.min(400, zoom + delta));
+      applyZoom();
+    };
+
+    const showBlob = (blob, name) => {
+      revoke();
+      currentBlob = blob;
+      currentName = name || 'image';
+      currentUrl = URL.createObjectURL(blob);
+      zoom = 0;
+      img.src = currentUrl;
+      img.alt = currentName;
+      img.style.display = 'block';
+      dlBtn.disabled = false;
+      note.textContent = `${currentName} (${MH.bytes(blob.size || 0)})`;
+      applyZoom();
+    };
+
+    const loadPath = async (p) => {
+      try {
+        const blob = await FS.readBlob(FS.normalize(p));
+        if (!body.isConnected) return;
+        showBlob(blob, FS.basename(p));
+      } catch (err) {
+        MH.toast(err?.message || 'Could not open image.');
+      }
+    };
+
+    body.querySelector('#iv-open').onclick = () => {
+      MH.askFileSource('open').then((src) => {
+        if (src === 'device') fileInput.click();
+        else if (src === 'vfs') {
+          MH.vfsPick({ title: 'Open image from proton', accept: '.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.avif,.ico' }).then((p) => {
+            if (p) loadPath(p);
+          });
+        }
+      });
+    };
+
+    fileInput.onchange = () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      showBlob(f, f.name);
+      fileInput.value = '';
+    };
+
+    dlBtn.onclick = () => {
+      if (currentBlob) MH.downloadBlob(currentName || 'image.png', currentBlob);
+    };
+    body.querySelector('#iv-zoom-in').onclick = () => zoomBy(25);
+    body.querySelector('#iv-zoom-out').onclick = () => zoomBy(-25);
+    body.querySelector('#iv-fit').onclick = () => { zoom = 0; applyZoom(); };
+
+    body.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(25); }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(-25); }
+      else if (e.key === '0') { e.preventDefault(); zoom = 0; applyZoom(); }
+    });
+
+    body.openPath = (opts = {}) => {
+      if (opts.path) loadPath(opts.path);
+    };
+    body.onDestroy = revoke;
+
+    if (options.path) loadPath(options.path);
+  },
+});
+</script>
+</body>
+</html>

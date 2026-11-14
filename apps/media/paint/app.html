@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paint - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Paint</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: paint — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ PAINT ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    const COLORS = [
+      '#000000', '#ffffff', '#e53935', '#fb8c00', '#fdd835',
+      '#43a047', '#1e88e5', '#8e24aa', '#d81b60', '#757575',
+    ];
+    let color = '#000000';
+    let size = 4;
+    let tool = 'pen';
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    body.innerHTML = `${bar('Paint', `
+      <div id="paint-colors" style="display:flex;gap:4px;align-items:center">
+        ${COLORS.map((c, i) => `<button type="button" data-color="${c}" aria-label="Color ${c}" style="width:22px;height:22px;border-radius:50%;border:2px solid ${i === 0 ? '#fff' : '#555'};background:${c};padding:0"></button>`).join('')}
+      </div>
+      <label class="muted" style="display:flex;align-items:center;gap:5px;font-size:12px">Size
+        <input type="range" id="paint-size" min="1" max="32" value="4" style="width:80px">
+      </label>
+      <button type="button" class="btn sm" id="paint-eraser">Eraser</button>
+      <button type="button" class="btn sm" id="paint-clear">Clear</button>
+      <button type="button" class="btn sm primary" id="paint-save">${iconSvg('save')} Save PNG</button>
+    `)}
+    <div style="flex:1;min-height:0;overflow:auto;display:grid;place-items:center;padding:12px;background:#111">
+      <canvas id="paint-canvas" width="760" height="460" style="background:#ffffff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:crosshair;touch-action:none"></canvas>
+    </div>`;
+
+    const canvas = body.querySelector('#paint-canvas');
+    let ctx = null;
+    try { ctx = canvas.getContext('2d'); } catch {}
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const colorBtns = [...body.querySelectorAll('#paint-colors [data-color]')];
+    const eraserBtn = body.querySelector('#paint-eraser');
+    const syncSwatches = () => {
+      colorBtns.forEach((b) => {
+        b.style.borderColor = tool === 'pen' && b.dataset.color === color ? '#ffffff' : '#555555';
+      });
+      eraserBtn.classList.toggle('primary', tool === 'eraser');
+    };
+
+    colorBtns.forEach((btn) => {
+      btn.onclick = () => {
+        color = btn.dataset.color;
+        tool = 'pen';
+        syncSwatches();
+      };
+    });
+    body.querySelector('#paint-size').oninput = (e) => {
+      size = Math.max(1, parseInt(e.target.value, 10) || 4);
+    };
+    eraserBtn.onclick = () => {
+      tool = tool === 'eraser' ? 'pen' : 'eraser';
+      syncSwatches();
+    };
+    body.querySelector('#paint-clear').onclick = () => {
+      if (!ctx) return;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+
+    const pointFor = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const sx = r.width ? canvas.width / r.width : 1;
+      const sy = r.height ? canvas.height / r.height : 1;
+      return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+    };
+
+    const stroke = (x1, y1, x2, y2) => {
+      if (!ctx) return;
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const p = pointFor(e);
+      drawing = true;
+      lastX = p.x;
+      lastY = p.y;
+      stroke(p.x, p.y, p.x + 0.01, p.y);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing) return;
+      const p = pointFor(e);
+      stroke(lastX, lastY, p.x, p.y);
+      lastX = p.x;
+      lastY = p.y;
+    });
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+
+    body.querySelector('#paint-save').onclick = async () => {
+      const saveBlob = async (blob) => {
+        const dest = await MH.askFileSource('save');
+        if (!dest) return;
+        const name = `painting-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+        if (dest === 'device') {
+          MH.downloadBlob(name, blob);
+          return;
+        }
+        const target = FS.join(FS.home(), 'Pictures', name);
+        await FS.writeBlob(target, blob);
+        MH.toast(`Saved ${name} to Pictures.`);
+      };
+      if (canvas.toBlob) {
+        canvas.toBlob((blob) => {
+          if (blob) saveBlob(blob);
+          else MH.toast('Could not encode PNG in this browser.');
+        }, 'image/png');
+      }
+    };
+  },
+});
+</script>
+</body>
+</html>

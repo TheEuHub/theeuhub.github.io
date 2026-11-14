@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Viewer - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>PDF Viewer</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: pdf — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ PDF VIEWER ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body, options = {}) {
+    let currentUrl = '';
+    let currentBlob = null;
+    let currentName = '';
+
+    body.innerHTML = `${bar('PDF Viewer', `
+      <button type="button" class="btn sm" id="pdf-open">${iconSvg('folder-open')} Open…</button>
+      <button type="button" class="btn sm" id="pdf-download" disabled>${iconSvg('download')} Download</button>
+      <a class="btn sm primary" id="pdf-newtab" href="#" target="_blank" rel="noopener" aria-disabled="true">${iconSvg('external')} Open in new tab</a>
+      <input type="file" id="pdf-file" accept=".pdf,application/pdf" hidden>
+    `)}
+    <div id="pdf-note" class="muted" style="padding:6px 12px;border-bottom:1px solid var(--line);background:#0c0c0c">Choose a PDF to view here or open in a new tab.</div>
+    <iframe id="pdf-frame" class="site-frame" title="PDF Viewer" style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#111"></iframe>`;
+
+    const frame = body.querySelector('#pdf-frame');
+    const note = body.querySelector('#pdf-note');
+    const dlBtn = body.querySelector('#pdf-download');
+    const newTab = body.querySelector('#pdf-newtab');
+    const fileInput = body.querySelector('#pdf-file');
+
+    const revoke = () => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+        currentUrl = '';
+      }
+    };
+
+    const showBlob = (blob, name) => {
+      revoke();
+      currentBlob = blob;
+      currentName = name || 'document.pdf';
+      currentUrl = URL.createObjectURL(blob);
+      frame.src = currentUrl;
+      frame.title = currentName;
+      dlBtn.disabled = false;
+      newTab.href = currentUrl;
+      newTab.removeAttribute('aria-disabled');
+      note.textContent = `${currentName} — if your browser blocks inline PDFs, use Open in new tab.`;
+    };
+
+    const loadPath = async (p) => {
+      try {
+        const blob = await FS.readBlob(FS.normalize(p));
+        if (!body.isConnected) return;
+        showBlob(blob, FS.basename(p));
+      } catch (err) {
+        MH.toast(err?.message || 'Could not open PDF.');
+      }
+    };
+
+    body.querySelector('#pdf-open').onclick = () => {
+      MH.askFileSource('open').then((src) => {
+        if (src === 'device') fileInput.click();
+        else if (src === 'vfs') {
+          MH.vfsPick({ title: 'Open PDF from proton', accept: '.pdf' }).then((p) => {
+            if (p) loadPath(p);
+          });
+        }
+      });
+    };
+
+    fileInput.onchange = () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      showBlob(f, f.name);
+      fileInput.value = '';
+    };
+
+    dlBtn.onclick = () => {
+      if (currentBlob) MH.downloadBlob(currentName || 'document.pdf', currentBlob);
+    };
+
+    body.openPath = (opts = {}) => {
+      if (opts.path) loadPath(opts.path);
+    };
+    body.onDestroy = revoke;
+
+    if (options.path) loadPath(options.path);
+  },
+});
+</script>
+</body>
+</html>

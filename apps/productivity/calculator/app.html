@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculator - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Calculator</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: calculator — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ CALCULATOR ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    if (!document.getElementById('proton-calc-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-calc-css';
+      st.textContent = `
+        .calc-wrap{flex:1;display:flex;flex-direction:column;gap:10px;padding:12px;background:#0a0a0a;outline:none;user-select:none}
+        .calc-screen{background:#121212;border:1px solid #333;border-radius:8px;padding:10px 14px;text-align:right}
+        .calc-expr{min-height:18px;font-size:12px;color:#999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .calc-val{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .calc-grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+        .calc-btn{border:1px solid #3a3a3a;border-radius:7px;background:#1a1a1a;color:#fff;font-size:16px;font-weight:600;display:grid;place-items:center}
+        .calc-btn:hover{background:#282828}
+        .calc-btn.op{background:#252525}
+        .calc-btn.eq{background:var(--accent);color:var(--accent-ink);border-color:var(--accent-dim)}
+        .calc-btn.eq:hover{background:var(--accent-dim)}
+        .calc-btn.wide{grid-column:span 2}
+      `;
+      document.head.appendChild(st);
+    }
+
+    body.innerHTML = `${bar('Calculator', '<span class="muted">Keyboard: 0-9, +, -, *, /, Enter, Esc</span>')}
+      <div class="calc-wrap" id="calc-wrap" tabindex="0">
+        <div class="calc-screen">
+          <div class="calc-expr" id="calc-expr"></div>
+          <div class="calc-val" id="calc-display">0</div>
+        </div>
+        <div class="calc-grid">
+          <button type="button" class="calc-btn op" data-k="ac">AC</button>
+          <button type="button" class="calc-btn op" data-k="neg">+/-</button>
+          <button type="button" class="calc-btn op" data-k="%">%</button>
+          <button type="button" class="calc-btn op" data-k="/">/</button>
+          <button type="button" class="calc-btn" data-k="7">7</button>
+          <button type="button" class="calc-btn" data-k="8">8</button>
+          <button type="button" class="calc-btn" data-k="9">9</button>
+          <button type="button" class="calc-btn op" data-k="*">*</button>
+          <button type="button" class="calc-btn" data-k="4">4</button>
+          <button type="button" class="calc-btn" data-k="5">5</button>
+          <button type="button" class="calc-btn" data-k="6">6</button>
+          <button type="button" class="calc-btn op" data-k="-">-</button>
+          <button type="button" class="calc-btn" data-k="1">1</button>
+          <button type="button" class="calc-btn" data-k="2">2</button>
+          <button type="button" class="calc-btn" data-k="3">3</button>
+          <button type="button" class="calc-btn op" data-k="+">+</button>
+          <button type="button" class="calc-btn" data-k="0">0</button>
+          <button type="button" class="calc-btn" data-k=".">.</button>
+          <button type="button" class="calc-btn op" data-k="back">DEL</button>
+          <button type="button" class="calc-btn eq" data-k="=">=</button>
+        </div>
+      </div>`;
+
+    const wrap = body.querySelector('#calc-wrap');
+    const disp = body.querySelector('#calc-display');
+    const expr = body.querySelector('#calc-expr');
+
+    let current = '0';
+    let acc = null;
+    let op = null;
+    let fresh = false;
+    let lastOp = null;
+    let lastArg = null;
+
+    const fmt = (n) => {
+      if (!Number.isFinite(n)) return 'Error';
+      const rounded = Math.round(n * 1e12) / 1e12;
+      return String(Object.is(rounded, -0) ? 0 : rounded);
+    };
+
+    const compute = (a, operator, b) => {
+      if (operator === '+') return a + b;
+      if (operator === '-') return a - b;
+      if (operator === '*') return a * b;
+      if (operator === '/') return b === 0 ? Infinity : a / b;
+      return b;
+    };
+
+    const update = () => {
+      disp.textContent = current;
+      expr.textContent = op && acc !== null ? `${fmt(acc)} ${op}` : '';
+    };
+
+    const press = (k) => {
+      if (current === 'Error' && k !== 'ac') {
+        current = '0';
+        acc = null;
+        op = null;
+        fresh = false;
+      }
+      if (/^[0-9]$/.test(k)) {
+        if (fresh || current === '0') {
+          current = k;
+          fresh = false;
+        } else if (current.length < 18) {
+          current += k;
+        }
+      } else if (k === '.') {
+        if (fresh) {
+          current = '0.';
+          fresh = false;
+        } else if (!current.includes('.')) {
+          current += '.';
+        }
+      } else if (k === 'ac') {
+        current = '0';
+        acc = null;
+        op = null;
+        fresh = false;
+        lastOp = null;
+        lastArg = null;
+      } else if (k === 'back') {
+        if (fresh) {
+          current = '0';
+          fresh = false;
+        } else {
+          const next = current.slice(0, -1);
+          current = (!next || next === '-') ? '0' : next;
+        }
+      } else if (k === 'neg') {
+        if (current !== '0') {
+          current = current.startsWith('-') ? current.slice(1) : '-' + current;
+        }
+      } else if (k === '%') {
+        current = fmt(parseFloat(current) / 100);
+      } else if (['+', '-', '*', '/'].includes(k)) {
+        const val = parseFloat(current);
+        if (acc !== null && op && !fresh) {
+          const res = compute(acc, op, val);
+          current = fmt(res);
+          acc = current === 'Error' ? null : res;
+        } else {
+          acc = val;
+        }
+        op = current === 'Error' ? null : k;
+        fresh = true;
+        lastOp = null;
+        lastArg = null;
+      } else if (k === '=') {
+        const val = parseFloat(current);
+        if (op && acc !== null) {
+          const res = compute(acc, op, val);
+          lastOp = op;
+          lastArg = val;
+          current = fmt(res);
+          acc = null;
+          op = null;
+          fresh = true;
+        } else if (lastOp && lastArg !== null) {
+          const res = compute(val, lastOp, lastArg);
+          current = fmt(res);
+          fresh = true;
+        }
+      }
+      update();
+    };
+
+    wrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-k]');
+      if (!btn) return;
+      press(btn.dataset.k);
+    });
+
+    wrap.addEventListener('keydown', (e) => {
+      const map = { Enter: '=', '=': '=', Escape: 'ac', c: 'ac', C: 'ac', Backspace: 'back', '%': '%' };
+      const k = map[e.key] || (/^[0-9.+\-*/]$/.test(e.key) ? e.key : '');
+      if (!k) return;
+      e.preventDefault();
+      press(k);
+    });
+
+    wrap.focus();
+  },
+});
+</script>
+</body>
+</html>
