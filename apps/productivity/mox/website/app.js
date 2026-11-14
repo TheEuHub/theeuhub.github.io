@@ -161,7 +161,13 @@ const QUERY_ALIASES = {
   window: ['desktop', 'browser', 'layout'],
   git: ['version control', 'commit', 'branch', 'github'],
   github: ['git', 'repository', 'pull request'],
-  repo: ['repository', 'git', 'project'],
+  repo: ['repository', 'repositories', 'github', 'theeuhub'],
+  repos: ['repositories', 'repository', 'github', 'theeuhub'],
+  repository: ['repositories', 'repo', 'github', 'theeuhub'],
+  repositories: ['repository', 'repos', 'github', 'theeuhub'],
+  proton: ['theeuhub', 'desktop', 'browser', 'apps'],
+  ampler: ['eaglercraft', 'launcher', 'minecraft', 'clients'],
+  eaglercraft: ['ampler', 'launcher', 'minecraft', 'wasm'],
   token: ['password', 'security', 'authentication'],
   search: ['index', 'query', 'find'],
   audio: ['sound', 'playback', 'browser'],
@@ -804,7 +810,12 @@ async function readModelManifest() {
   for (const entry of base.models || []) {
     try {
       const head = await fetch(`models/${entry.file}`, { method: 'HEAD', cache: 'no-store' });
-      if (head.ok) available.push(entry);
+      if (head.ok) {
+        available.push(entry);
+      } else if (head.status === 405) {
+        const probe = await fetch(`models/${entry.file}`, { headers: { Range: 'bytes=0-0' }, cache: 'no-store' });
+        if (probe.ok || probe.status === 206) available.push(entry);
+      }
     } catch { /* ignore missing files */ }
   }
 
@@ -842,13 +853,43 @@ function describeModel() {
 
 const WLLAMA_COMPAT_JS = new URL('vendor/wllama/compat/wllama.js', import.meta.url).href;
 const WLLAMA_COMPAT_WASM = new URL('vendor/wllama/compat/wllama.wasm', import.meta.url).href;
+const TABLE64_PROBE = new Uint8Array([
+  0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+  0x04, 0x05, 0x01, 0x70, 0x05, 0x01, 0x01
+]);
 
-// Older browsers without JSPI or 64-bit memory need wllama's compatibility build.
-// If those files are vendored, use them so nothing is fetched from a CDN.
+function isSupportTable64() {
+  try {
+    return typeof WebAssembly !== 'undefined'
+      && typeof WebAssembly.validate === 'function'
+      && WebAssembly.validate(TABLE64_PROBE);
+  } catch {
+    return false;
+  }
+}
+
+function isSupportNativeWllama() {
+  if (typeof WebAssembly === 'undefined' || !WebAssembly.Suspending) return false;
+  if (!isSupportTable64()) return false;
+  try {
+    new WebAssembly.Memory({ address: 'i64', initial: 1n });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Older browsers without JSPI, Memory64, or Table64 need wllama's compatibility build.
+// Use the vendored files in vendor/wllama/compat/ so nothing is fetched from a CDN.
 async function vendoredCompat() {
   try {
     const head = await fetch(WLLAMA_COMPAT_WASM, { method: 'HEAD' });
-    return head.ok ? { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM } : null;
+    if (head.ok) return { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM };
+    if (head.status === 405) {
+      const probe = await fetch(WLLAMA_COMPAT_WASM, { headers: { Range: 'bytes=0-0' } });
+      if (probe.ok || probe.status === 206) return { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -859,14 +900,31 @@ const NOOP_CACHE = {
   list: async () => [], delete: async () => {}, getNameFromURL: async (url) => String(url)
 };
 
-async function createEngine() {
+async function createEngine({ forceCompat = false, compat = undefined, onWorkerError = null } = {}) {
   const { Wllama } = await import(WLLAMA_URL);
+  const resolvedCompat = compat === undefined ? await vendoredCompat() : compat;
+  const useCompat = Boolean(resolvedCompat && (forceCompat || !isSupportNativeWllama()));
   // wllama resolves `default` and the `wllama.wasm` key to the runtime binary.
   // Both point at the copy in this repository so no CDN is ever contacted.
-  const config = { default: WLLAMA_WASM, 'wllama.wasm': WLLAMA_WASM };
+  const config = useCompat
+    ? { default: resolvedCompat.wasm, 'wllama.wasm': resolvedCompat.wasm }
+    : { default: WLLAMA_WASM, 'wllama.wasm': WLLAMA_WASM };
   const options = {
     suppressNativeLog: true,
-    logger: { debug() {}, log() {}, warn() {}, error: (...args) => console.warn('[wllama]', ...args) }
+    logger: {
+      debug() {},
+      log() {},
+      warn() {},
+      error: (...args) => {
+        console.warn('[wllama]', ...args);
+        const errArg = args.find((item) =>
+          item instanceof Error || (item && typeof item === 'object' && item.type === 'error')
+        );
+        if (errArg && onWorkerError) {
+          onWorkerError(errArg instanceof Error ? errArg : new Error(errArg.message || 'WebAssembly worker failed to start'));
+        }
+      }
+    }
   };
 
   let instance;
@@ -878,9 +936,87 @@ async function createEngine() {
     console.warn('Falling back to an in-memory model cache:', error);
     instance = new Wllama(config, { ...options, cacheManager: NOOP_CACHE });
   }
+  if (resolvedCompat) {
+    // Pass 'firefox_safari' mode so Firefox does not discard the vendored compat paths.
+    instance.setCompat?.(resolvedCompat, 'firefox_safari');
+    if (useCompat && typeof instance.getWorkerResources === 'function') {
+      instance.getWorkerResources = () => ({
+        wasmPath: new URL(resolvedCompat.wasm, window.location.href).href,
+        jsPath: resolvedCompat.worker,
+        compat: true
+      });
+    }
+  }
+  return { instance, useCompat };
+}
+
+async function loadModelWithFallbacks(blobs, { onAttempt } = {}) {
+  if (engine) {
+    try { await engine.exit?.(); } catch {}
+    engine = null;
+  }
+
   const compat = await vendoredCompat();
-  if (compat) instance.setCompat(compat);
-  return instance;
+  const baseThreads = Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2));
+  const nativeSupported = isSupportNativeWllama();
+  const hasGpu = Boolean(typeof navigator !== 'undefined' && navigator.gpu);
+  const rawAttempts = [
+    { forceCompat: !nativeSupported, n_gpu_layers: hasGpu && nativeSupported ? undefined : 0, n_threads: baseThreads, n_ctx: CONTEXT_SIZE },
+    { forceCompat: !nativeSupported, n_gpu_layers: 0, n_threads: baseThreads, n_ctx: CONTEXT_SIZE },
+    { forceCompat: !nativeSupported, n_gpu_layers: 0, n_threads: 1, n_ctx: CONTEXT_SIZE },
+    { forceCompat: true, n_gpu_layers: 0, n_threads: 1, n_ctx: CONTEXT_SIZE },
+    { forceCompat: true, n_gpu_layers: 0, n_threads: 1, n_ctx: Math.min(2048, CONTEXT_SIZE) }
+  ];
+
+  const seen = new Set();
+  const attempts = [];
+  for (const plan of rawAttempts) {
+    const effectiveCompat = Boolean(compat && plan.forceCompat);
+    const effectiveGpu = effectiveCompat ? 0 : plan.n_gpu_layers;
+    const key = `${effectiveCompat}|${effectiveGpu ?? 'auto'}|${plan.n_threads}|${plan.n_ctx}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    attempts.push({ ...plan, forceCompat: effectiveCompat, n_gpu_layers: effectiveGpu });
+  }
+
+  let lastError = null;
+  for (const plan of attempts) {
+    onAttempt?.(plan);
+    let rejectWorker;
+    const workerErrorPromise = new Promise((_, reject) => { rejectWorker = reject; });
+    let candidate = null;
+    let useCompat = plan.forceCompat;
+    try {
+      const created = await createEngine({
+        forceCompat: plan.forceCompat,
+        compat,
+        onWorkerError: (err) => rejectWorker?.(err)
+      });
+      candidate = created.instance;
+      useCompat = created.useCompat;
+      const loadOptions = {
+        n_ctx: plan.n_ctx,
+        n_threads: plan.n_threads,
+        n_batch: Math.min(256, plan.n_ctx),
+        jinja: true,
+        seed: 42
+      };
+      if (plan.n_gpu_layers !== undefined) loadOptions.n_gpu_layers = plan.n_gpu_layers;
+      await Promise.race([
+        candidate.loadModel(blobs, loadOptions),
+        workerErrorPromise
+      ]);
+      engine = candidate;
+      return { engine: candidate, threadsUsed: plan.n_threads, ctxUsed: plan.n_ctx, compatUsed: useCompat };
+    } catch (error) {
+      lastError = error;
+      console.warn('Model load attempt failed, trying fallback:', plan, error);
+      if (candidate) {
+        try { await candidate.exit?.(); } catch {}
+      }
+    }
+  }
+  throw lastError || new Error('Model failed to load');
 }
 
 async function startModel({ auto = false } = {}) {
@@ -952,15 +1088,11 @@ async function startModel({ auto = false } = {}) {
     elements.progressLabel.textContent = 'Starting the inference engine…';
     elements.progressPercent.textContent = '…';
     if (elements.sideHelpStatusText) elements.sideHelpStatusText.textContent = 'Starting chat engine…';
-    engine = await createEngine();
-    const threads = Math.max(1, Math.min(8, navigator.hardwareConcurrency || 2));
-    elements.progressLabel.textContent = `Loading weights (${threads} thread${threads === 1 ? '' : 's'})…`;
-    await engine.loadModel([blob], {
-      n_ctx: CONTEXT_SIZE,
-      n_threads: threads,
-      n_batch: 256,
-      jinja: true,
-      seed: 42
+    const { threadsUsed, compatUsed } = await loadModelWithFallbacks([blob], {
+      onAttempt: (plan) => {
+        const modeNote = plan.forceCompat ? ', compat' : '';
+        elements.progressLabel.textContent = `Loading weights (${plan.n_threads} thread${plan.n_threads === 1 ? '' : 's'}${modeNote})…`;
+      }
     });
 
     modelReady = true;
@@ -972,7 +1104,7 @@ async function startModel({ auto = false } = {}) {
     elements.modelTitle.textContent = 'Mox is ready';
     elements.modelDescription.textContent = `${describeModel()} is running in this browser. Questions, your files, and the knowledge library stay on this device.`;
     elements.modelSize.textContent = 'Loaded';
-    elements.modelFootnote.textContent = `Served by this site · ${threads} thread${threads === 1 ? '' : 's'} · works offline after the first load`;
+    elements.modelFootnote.textContent = `Served by this site · ${threadsUsed} thread${threadsUsed === 1 ? '' : 's'}${compatUsed ? ' · compat mode' : ''} · works offline after the first load`;
     elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('check', 'mox-ico')}</span> Model loaded`;
     elements.load.classList.add('loaded');
     elements.load.disabled = true;
@@ -2250,7 +2382,7 @@ function openModal(kind = 'privacy', category = null) {
   } else {
     elements.modalCopy.innerHTML = `
       <p>The model is a ${escapeHTML(describeModel())} GGUF file served by this website and executed in your browser by llama.cpp (WebAssembly). Your questions, your imported files, and the passages retrieved for them never leave this device.</p>
-      <p><strong>The knowledge library</strong> is part of this site: ${libraryDocuments.length} documents covering mathematics, reading and writing, technology, science, humanities, and life skills. They are downloaded as text into your browser once, indexed locally, and searched for every question. They do not change the model's weights.</p>
+      <p><strong>The knowledge library</strong> is part of this site: ${libraryDocuments.length} documents covering mathematics, reading and writing, technology, science, humanities, life skills, and your GitHub repositories. They are downloaded as text into your browser once, indexed locally, and searched for every question. They do not change the model's weights.</p>
       <p><strong>No third-party model host.</strong> The engine (<code>vendor/wllama</code>) and the weights (<code>models/</code>) sit next to the page, so once the model is loaded the app keeps working offline.</p>
       <p><strong>Your workspace</strong> is the same story: files you write, import, or ask Mox to edit are saved in this browser's IndexedDB, previewed in a sandboxed frame, and never uploaded. The calculator runs locally and keeps its history in local storage.</p>
       <p><strong>Storage:</strong> imported files, the library cache, uploaded models, your workspace, and the browser's copy of the model live in IndexedDB. Clearing site data removes them.</p>`;
@@ -2579,9 +2711,12 @@ async function loadModelFile(file) {
     elements.progressLabel.textContent = `${file.name} · ${displaySize(file.size)}`;
     elements.progressBar.style.width = '35%';
     elements.progressPercent.textContent = '…';
-    engine = await createEngine();
-    const threads = Math.max(1, Math.min(8, navigator.hardwareConcurrency || 2));
-    await engine.loadModel([file], { n_ctx: CONTEXT_SIZE, n_threads: threads, n_batch: 256, jinja: true });
+    const { threadsUsed, compatUsed } = await loadModelWithFallbacks([file], {
+      onAttempt: (plan) => {
+        const modeNote = plan.forceCompat ? ', compat' : '';
+        elements.progressLabel.textContent = `${file.name} · loading (${plan.n_threads} thread${plan.n_threads === 1 ? '' : 's'}${modeNote})…`;
+      }
+    });
     modelReady = true;
     searchOnly = false;
     loadedModel = stored || { name: file.name, bytes: file.size, parameters: '', quantization: '', license: 'your file' };
@@ -2596,6 +2731,7 @@ async function loadModelFile(file) {
     elements.modelTitle.textContent = 'Mox is ready';
     elements.modelDescription.textContent = `${file.name} is running in this browser.`;
     elements.modelSize.textContent = displaySize(file.size);
+    elements.modelFootnote.textContent = `Uploaded by you · ${threadsUsed} thread${threadsUsed === 1 ? '' : 's'}${compatUsed ? ' · compat mode' : ''}`;
     elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('check', 'mox-ico')}</span> Model loaded`;
     elements.load.classList.add('loaded');
     elements.load.disabled = true;

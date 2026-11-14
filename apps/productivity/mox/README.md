@@ -7,9 +7,11 @@ nothing typed into it leaves the device.
 ## What ships here
 
 - `apps/productivity/mox/website/` contains the static browser bundle from
-  `github.com/Math-halper/mox`, including `wllama` (`vendor/wllama/`), `pdf.js`
-  (`vendor/pdfjs/`), the 55-document cited knowledge library (`knowledge/`),
-  and the quantized `SmolLM2-135M-Instruct` (`Q4_1`) GGUF weights
+  `github.com/Math-halper/mox`, including `wllama` (`vendor/wllama/`, with
+  vendored `compat/` binaries), `pdf.js` (`vendor/pdfjs/`), the 58-document
+  cited knowledge library (`knowledge/`, including repository knowledge for
+  `TheEuHub/theeuhub.github.io` and `TheEuHub/Ampler-launcher`), and the
+  quantized `SmolLM2-135M-Instruct` (`Q4_1`) GGUF weights
   (`models/smollm2-135m-instruct-q4_1.gguf`).
 - Upstream desktop/deployment launchers, service worker (`sw.js`), tests, and
   build tooling are deliberately left out so proton serves a static, clean

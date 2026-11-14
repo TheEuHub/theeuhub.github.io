@@ -4,7 +4,7 @@ This folder is the reference library Mox reads. Every `.md`, `.txt`, `.pdf`, `.c
 
 ## Contents
 
-55 documents, roughly 56k words:
+58 documents, roughly 58k words:
 
 | Folder | Subject | Documents |
 | --- | --- | ---: |
@@ -14,6 +14,7 @@ This folder is the reference library Mox reads. Every `.md`, `.txt`, `.pdf`, `.c
 | `science/` | Physics, chemistry, biology and Earth science, astronomy and space | 6 |
 | `humanities/` | World history, geography and cultures, philosophy, modern history | 5 |
 | `life/` | Health, personal finance, study skills, careers, law and civics, cooking and food safety | 6 |
+| `repositories/` | TheEuHub GitHub repositories overview, `TheEuHub/theeuhub.github.io` (proton), and `TheEuHub/Ampler-launcher` | 3 |
 | `mox-starter-guide.md` | How this app works, and what it can do | 1 |
 
 ## How retrieval works

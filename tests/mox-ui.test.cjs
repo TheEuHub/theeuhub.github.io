@@ -212,3 +212,239 @@ test('Calculator-answerable questions pass the exact computed value to the AI mo
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Mox falls back cleanly through CPU/single-thread/compat modes and retrieves all TheEuHub repository docs', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mox-fallback-repos-'));
+  const html = fs.readFileSync(path.join(MOX, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(MOX, 'styles.css'), 'utf8');
+
+  const savedGlobals = {};
+  const setGlobal = (key, val) => {
+    savedGlobals[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value: val, configurable: true, writable: true });
+  };
+
+  try {
+    for (const file of ['calculator.js', 'model-store.js', 'svg.js', 'workspace.js']) {
+      fs.copyFileSync(path.join(MOX, file), path.join(tmpDir, file));
+    }
+    fs.writeFileSync(path.join(tmpDir, 'mock-wllama.js'), `
+      export class Wllama {
+        constructor(config) {
+          this.config = config;
+          this.compatArgs = null;
+          this.exited = false;
+        }
+        setCompat(compat, mode) {
+          this.compatArgs = { compat, mode };
+        }
+        getWorkerResources() {
+          return { wasmPath: this.config.default, compat: false };
+        }
+        async loadModel(_blobs, params) {
+          globalThis.__MOX_LOAD_ATTEMPTS.push({
+            config: this.config,
+            compatArgs: this.compatArgs,
+            resources: this.getWorkerResources(),
+            params
+          });
+          // Simulate WebGPU + multi-thread failure on first attempt(s), succeeding on single-thread compat CPU.
+          if (params.n_threads > 1 || !this.getWorkerResources().compat) {
+            throw new Error('Simulated multi-thread / non-compat load failure');
+          }
+          return true;
+        }
+        async exit() { this.exited = true; }
+        async createChatCompletion(opts) {
+          return { choices: [{ message: { content: 'Loaded in compat single-thread fallback.' } }] };
+        }
+      }
+    `);
+    const patchedApp = fs.readFileSync(path.join(MOX, 'app.js'), 'utf8')
+      .replace(`new URL('vendor/wllama/wllama.js', import.meta.url).href`, `new URL('./mock-wllama.js', import.meta.url).href`);
+    fs.writeFileSync(path.join(tmpDir, 'app.js'), patchedApp);
+
+    const dom = new JSDOM(html, {
+      url: 'http://127.0.0.1/apps/productivity/mox/website/index.html?nosw',
+      runScripts: 'dangerously',
+      beforeParse(win) {
+        Object.defineProperty(win.navigator, 'hardwareConcurrency', { value: 8, configurable: true });
+        Object.defineProperty(win.navigator, 'gpu', { value: {}, configurable: true });
+      }
+    });
+    const { window } = dom;
+    const { document } = window;
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
+
+    for (const k of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'Event', 'KeyboardEvent', 'CustomEvent', 'MutationObserver', 'DOMParser', 'localStorage', 'Blob', 'AbortController', 'navigator', 'location']) {
+      setGlobal(k, window[k]);
+    }
+    setGlobal('requestAnimationFrame', (fn) => setTimeout(fn, 0));
+    setGlobal('__MOX_LOAD_ATTEMPTS', []);
+
+    const libraryIndexJson = fs.readFileSync(path.join(MOX, 'knowledge/index.json'), 'utf8');
+    setGlobal('fetch', async (u) => {
+      const s = String(u);
+      if (s.includes('vendor/wllama/compat/wllama.wasm')) {
+        return new Response(new Uint8Array([0x00, 0x61, 0x73, 0x6d]), { status: 200 });
+      }
+      if (s.includes('models/manifest.json')) {
+        return new Response(JSON.stringify({
+          default: 'smollm2',
+          models: [{ id: 'smollm2', name: 'SmolLM2', file: 'smollm2.gguf', bytes: 16, parameters: '135M' }],
+          available: [{ id: 'smollm2', name: 'SmolLM2', file: 'smollm2.gguf', bytes: 16, parameters: '135M' }]
+        }), { status: 200 });
+      }
+      if (s.includes('models/smollm2.gguf')) {
+        return new Response('GGUF', { status: 200, headers: { 'Content-Length': '4' } });
+      }
+      if (s.includes('knowledge/index.json')) {
+        return new Response(libraryIndexJson, { status: 200 });
+      }
+      const kMatch = s.match(/knowledge\/(.+)$/);
+      if (kMatch) {
+        const fp = path.join(MOX, 'knowledge', kMatch[1]);
+        if (fs.existsSync(fp)) return new Response(fs.readFileSync(fp, 'utf8'), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    await import(path.join(tmpDir, 'app.js'));
+    await new Promise((r) => setTimeout(r, 250));
+
+    const state = window.__mox.state();
+    assert.equal(state.modelReady, true, 'fallback ladder recovered instead of falling back to searchOnly');
+    assert.equal(state.searchOnly, false);
+    assert.equal(state.libraryCount, 58);
+
+    const attempts = globalThis.__MOX_LOAD_ATTEMPTS;
+    assert.ok(attempts.length >= 2, `expected multi-step fallback attempts, got ${attempts.length}`);
+    const last = attempts[attempts.length - 1];
+    assert.equal(last.compatArgs?.mode, 'firefox_safari');
+    assert.equal(last.resources.compat, true);
+    assert.equal(last.params.n_threads, 1);
+    assert.equal(last.params.n_gpu_layers, 0);
+
+    const overviewHits = window.__mox.retrieve('What are all of my repositories?');
+    assert.ok(overviewHits.some((h) => h.doc.path.startsWith('repositories/')),
+      'overview query matches repositories category');
+    const overviewText = overviewHits.map((h) => h.text).join('\n');
+    assert.match(overviewText, /theeuhub\.github\.io/i);
+    assert.match(overviewText, /Ampler-launcher/i);
+
+    const protonHits = window.__mox.retrieve('Tell me about theeuhub.github.io and proton');
+    assert.equal(protonHits[0]?.doc.path, 'repositories/theeuhub-github-io-proton.md');
+
+    const amplerHits = window.__mox.retrieve('How does Ampler-launcher work?');
+    assert.equal(amplerHits[0]?.doc.path, 'repositories/ampler-launcher-repository.md');
+  } finally {
+    for (const [k, desc] of Object.entries(savedGlobals)) {
+      if (desc) Object.defineProperty(globalThis, k, desc);
+      else delete globalThis[k];
+    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('Vendored wllama + wllama-compat runtime loads bundled SmolLM2 GGUF and generates a reply', async () => {
+  const { Worker: NodeWorker, MessageChannel: NodeMessageChannel } = require('node:worker_threads');
+  const compatWasm = path.join(MOX, 'vendor/wllama/compat/wllama.wasm');
+  const compatJs = path.join(MOX, 'vendor/wllama/compat/wllama.js');
+  const mod = new WebAssembly.Module(fs.readFileSync(compatWasm));
+  assert.ok(WebAssembly.Module.exports(mod).length > 0);
+
+  const savedGlobals = {};
+  const setGlobal = (key, val) => {
+    savedGlobals[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value: val, configurable: true, writable: true });
+  };
+
+  const blobRegistry = new Map();
+  let blobCounter = 1;
+  let instance = null;
+  try {
+    setGlobal('window', globalThis);
+    setGlobal('navigator', { userAgent: 'Mozilla/5.0', hardwareConcurrency: 2 });
+    setGlobal('MessageChannel', NodeMessageChannel);
+    setGlobal('document', { baseURI: 'http://localhost/' });
+    setGlobal('URL', class extends URL {});
+    globalThis.URL.createObjectURL = (b) => {
+      const u = `blob:test-${blobCounter++}`;
+      blobRegistry.set(u, b);
+      return u;
+    };
+    globalThis.URL.revokeObjectURL = (u) => blobRegistry.delete(u);
+
+    setGlobal('Worker', class {
+      constructor(url) {
+        const blob = blobRegistry.get(url);
+        this._ready = (async () => {
+          const code = await blob.text();
+          const bootstrap = `
+            const { parentPort } = require('node:worker_threads');
+            const nodeFs = require('node:fs');
+            globalThis.self = globalThis;
+            globalThis.WorkerGlobalScope = function(){};
+            globalThis.location = { href: 'http://localhost/' };
+            globalThis.WorkerNavigator = function(){};
+            globalThis.WorkerNavigator.prototype = {};
+            globalThis.navigator = Object.create(globalThis.WorkerNavigator.prototype);
+            globalThis.postMessage = (d) => parentPort.postMessage(d);
+            globalThis.fetch = async (u) => {
+              const s = String(u).replace('http://localhost', '');
+              return new Response(nodeFs.readFileSync(s), { status: 200 });
+            };
+            WebAssembly.instantiateStreaming = async (respPromise, imports) => {
+              const resp = await respPromise;
+              return WebAssembly.instantiate(await resp.arrayBuffer(), imports);
+            };
+            Object.defineProperty(globalThis, 'process', { value: undefined, configurable: true });
+            ${code}
+            parentPort.on('message', (data) => { if (typeof onmessage === 'function') onmessage({ data }); });
+          `;
+          this._nw = new NodeWorker(bootstrap, { eval: true });
+          this._nw.on('message', (data) => { if (this.onmessage) this.onmessage({ data }); });
+          this._nw.on('error', (err) => { if (this.onerror) this.onerror(err); });
+          return this._nw;
+        })();
+      }
+      async postMessage(data) { (await this._ready).postMessage(data); }
+      async terminate() { return (await this._ready).terminate(); }
+    });
+
+    setGlobal('fetch', async (u) => {
+      const s = String(u).replace('http://localhost', '');
+      return new Response(fs.readFileSync(s), { status: 200 });
+    });
+
+    const NOOP_CACHE = {
+      match: async () => null, put: async () => {}, getSize: async () => -1,
+      list: async () => [], delete: async () => {}, getNameFromURL: async (u) => String(u)
+    };
+    const { Wllama } = await import(path.join(MOX, 'vendor/wllama/wllama.js'));
+    instance = new Wllama({ default: compatWasm, 'wllama.wasm': compatWasm }, {
+      suppressNativeLog: true,
+      cacheManager: NOOP_CACHE
+    });
+    instance.setCompat({ worker: compatJs, wasm: compatWasm }, 'firefox_safari');
+
+    const gguf = fs.readFileSync(path.join(MOX, 'models/smollm2-135m-instruct-q4_1.gguf'));
+    await instance.loadModel([new Blob([gguf])], {
+      n_ctx: 512, n_threads: 1, n_batch: 64, n_gpu_layers: 0, jinja: true, seed: 42
+    });
+    const out = await instance.createChatCompletion({
+      messages: [{ role: 'user', content: 'Say hello in 3 words.' }],
+      max_tokens: 10,
+      temp: 0.1
+    });
+    assert.ok((out?.choices?.[0]?.message?.content || '').trim().length > 0);
+  } finally {
+    if (instance) await instance.exit().catch(() => {});
+    for (const [k, desc] of Object.entries(savedGlobals)) {
+      if (desc) Object.defineProperty(globalThis, k, desc);
+      else delete globalThis[k];
+    }
+  }
+});

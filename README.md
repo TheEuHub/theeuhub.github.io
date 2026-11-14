@@ -58,7 +58,7 @@ and its left edge resizes it (see [AI button](#ai-button-mox)).
 | **Files** (`files`) | Browse `/` and your own `/home/<you>`: create, rename, move, copy, import, search, download (folders as ZIP) |
 | **Text Editor** (`text-editor`) | Open, edit and save text files in your home folder; proton's own files open read-only |
 | **PDF Viewer** (`pdf`) | Read PDF files in your browser's own viewer — no extra library, nothing uploaded |
-| **Mox** (`mox`) | A private AI workspace whose small language model runs on your device. Chat that cites a 55-document library, a code workspace, SVG drawing and a calculator. The panel's AI button (Alt+C) docks it beside your windows |
+| **Mox** (`mox`) | A private AI workspace whose small language model runs on your device. Chat that cites a 58-document library (including `TheEuHub` repositories), a code workspace, SVG drawing and a calculator. The panel's AI button (Alt+C) docks it beside your windows |
 | **Image Viewer** (`image-viewer`) | View PNG, JPG, GIF, WebP, AVIF, BMP, ICO and SVG files with zoom and a folder playlist |
 | **Paint** (`paint`) | Draw with a brush, shapes, an eraser and a colour picker, then save the picture into either file system |
 | **Piano** (`piano`) | Play the keys, record a tune and play it back (the computer keyboard plays notes too) |
@@ -384,7 +384,7 @@ the documentation, each app module's own comments, the built-in website pages
 and the source comments — and writes one inverted index to
 `data/search-index.js` (101 documents, ~2,750 terms, ~102 KB). Vendored sites
 stay out of it: only proton's wrapper page speaks for each game, and Mox's own
-55-document knowledge library is Mox's corpus, not proton's. Like
+58-document knowledge library is Mox's corpus, not proton's. Like
 `data/fs-manifest.js` it is generated and committed: re-run it after changing
 documentation or an app's prose, then commit. Its output is deterministic (no
 timestamps, sorted documents and terms), so re-running writes the same bytes,

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generated": "2026-10-30T21:46:35Z",
+  "generated": "2026-11-14T23:30:00Z",
   "categories": [
     {
       "id": "math",
@@ -31,6 +31,11 @@
       "id": "life",
       "name": "Life & Skills",
       "description": "Health, money, and learning how to learn."
+    },
+    {
+      "id": "repositories",
+      "name": "Repositories",
+      "description": "TheEuHub GitHub repositories, apps, architecture, tooling, and tests."
     },
     {
       "id": "",
@@ -169,8 +174,8 @@
       "path": "mox-starter-guide.md",
       "title": "About this workspace",
       "category": "",
-      "bytes": 8597,
-      "words": 1432
+      "bytes": 8735,
+      "words": 1444
     },
     {
       "path": "reading/grammar-and-punctuation.md",
@@ -213,6 +218,27 @@
       "category": "reading",
       "bytes": 3888,
       "words": 609
+    },
+    {
+      "path": "repositories/ampler-launcher-repository.md",
+      "title": "TheEuHub/Ampler-launcher (Eaglercraft Launcher)",
+      "category": "repositories",
+      "bytes": 4786,
+      "words": 548
+    },
+    {
+      "path": "repositories/theeuhub-github-io-proton.md",
+      "title": "TheEuHub/theeuhub.github.io (proton Browser Desktop)",
+      "category": "repositories",
+      "bytes": 5830,
+      "words": 693
+    },
+    {
+      "path": "repositories/theeuhub-repositories-overview.md",
+      "title": "TheEuHub GitHub Repositories Overview",
+      "category": "repositories",
+      "bytes": 3556,
+      "words": 450
     },
     {
       "path": "science/astronomy-and-space.md",

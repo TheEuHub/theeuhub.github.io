@@ -3291,6 +3291,7 @@ test('Mox, the AI app, is vendored whole and framed by its own wrapper', () => {
   /* Every browser file is here, and the page only loads its own files ... */
   for (const file of ['index.html', 'styles.css', 'app.js', 'calculator.js', 'model-store.js', 'svg.js', 'workspace.js',
     'README.md', 'knowledge/index.json', 'models/manifest.json', 'vendor/wllama/wllama.js', 'vendor/wllama/wllama.wasm',
+    'vendor/wllama/compat/wllama.js', 'vendor/wllama/compat/wllama.wasm',
     'vendor/pdfjs/pdf.min.js', 'vendor/pdfjs/pdf.worker.min.js', 'vendor/pdfjs/LICENSE']) {
     assert.ok(fs.existsSync(path.join(ROOT, MOX_DIR, file)), `Mox is missing ${file}`);
   }
@@ -3306,9 +3307,16 @@ test('Mox, the AI app, is vendored whole and framed by its own wrapper', () => {
     'Mox still honours ?nosw, so the frames proton opens register no service worker');
   /* ... the knowledge library it cites ... */
   const library = JSON.parse(source(`${MOX_DIR}/knowledge/index.json`));
-  assert.equal(library.documents.length, 55);
+  assert.equal(library.documents.length, 58);
   for (const doc of library.documents) {
     assert.ok(fs.existsSync(path.join(ROOT, MOX_DIR, 'knowledge', doc.path)), `knowledge/${doc.path} is missing`);
+  }
+  for (const repoDoc of [
+    'repositories/theeuhub-repositories-overview.md',
+    'repositories/theeuhub-github-io-proton.md',
+    'repositories/ampler-launcher-repository.md'
+  ]) {
+    assert.ok(library.documents.some((doc) => doc.path === repoDoc), `knowledge/index.json should include ${repoDoc}`);
   }
   /* ... and the real model and engine, not placeholders. */
   const manifest = JSON.parse(source(`${MOX_DIR}/models/manifest.json`));
@@ -3323,6 +3331,8 @@ test('Mox, the AI app, is vendored whole and framed by its own wrapper', () => {
   assert.equal(head(modelPath, 4).toString('latin1'), 'GGUF', 'the model is a GGUF file');
   assert.deepEqual([...head(path.join(ROOT, MOX_DIR, 'vendor/wllama/wllama.wasm'), 4)], [0x00, 0x61, 0x73, 0x6d],
     'wllama.wasm is WebAssembly');
+  assert.deepEqual([...head(path.join(ROOT, MOX_DIR, 'vendor/wllama/compat/wllama.wasm'), 4)], [0x00, 0x61, 0x73, 0x6d],
+    'compat/wllama.wasm is WebAssembly');
   /* Only the browser files: Mox's launchers, checks, tools, host settings
    * and its service worker stay upstream (apps/productivity/mox/README.md). */
   for (const gone of ['sw.js', 'run.py', 'start-mox.bat', 'start-mox.command', 'tests', 'tools', '.github', '_headers',
