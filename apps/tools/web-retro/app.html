@@ -179,8 +179,15 @@ registerApp({
         </button>`).join('');
       gridEl.querySelectorAll('[data-bundled]').forEach((btn) => {
         btn.onclick = () => {
-          const url = `${LAUNCH}?core=${encodeURIComponent(btn.dataset.bcore)}&rom=${encodeURIComponent(btn.dataset.bundled)}`;
-          launchFrame(url);
+          const romName = btn.dataset.bundled;
+          const url = `${LAUNCH}?core=${encodeURIComponent(btn.dataset.bcore)}&rom=${encodeURIComponent(romName)}`;
+          if (location.protocol === 'file:') { launchFrame(url); return; }
+          fetch(`apps/tools/web-retro/webretro/roms/${encodeURIComponent(romName)}`, { method: 'HEAD' })
+            .then((r) => {
+              if (r.ok) launchFrame(url);
+              else MH.toast(`"${romName}" is not bundled in this repo — load your own ROM from Emulators.`);
+            })
+            .catch(() => launchFrame(url));
         };
       });
     };

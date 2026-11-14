@@ -19,6 +19,7 @@ proton menu. The script below is fetched and run by proton's HTML loader
  * drawing and a math calculator. Vendored from github.com/Math-halper/mox
  * into apps/productivity/mox/website/ and framed with ?nosw so the panel's
  * AI button (Alt+C) and window share the same local page. */
+(() => {
 'use strict';
 
 /* ============================ MOX ============================ */
@@ -31,12 +32,15 @@ registerApp({
   render(body) {
     body.innerHTML = `${bar('Mox', `<span class="muted">Private AI workspace · <a href="https://github.com/Math-halper/mox" target="_blank" rel="noopener">Math-halper/mox</a></span><button type="button" class="btn sm" data-e="reload">${iconSvg('refresh')} Reload</button><a class="btn sm primary" data-e="ext" href="${MH.esc(MOX_PAGE)}" target="_blank" rel="noopener">${iconSvg('external')} Open in new tab</a>`)}
     <iframe class="site-frame" src="${MH.esc(MOX_PAGE)}" title="Mox" allowfullscreen style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#0a0a0a"></iframe>`;
+    const ext = body.querySelector('[data-e="ext"]');
+    if (ext) ext.href = MOX_PAGE;
     body.querySelector('[data-e="reload"]').onclick = () => {
       const f = body.querySelector('iframe.site-frame');
       f.src = MOX_PAGE;
     };
   },
 });
+})();
 </script>
 </body>
 </html>

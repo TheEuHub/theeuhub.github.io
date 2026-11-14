@@ -898,8 +898,7 @@ const fsConfigFile = "/home/web_user/retroarch/userdata/retroarch.cfg";
 function harvestKeybindsFromConfigText(text, validKeys, current) {
 	if (!text) return null;
 	var parsed = {};
-	var lines = text.split(/?
-/);
+	var lines = text.split(/\r?\n/);
 	for (var i = 0; i < lines.length; i++) {
 		var line = lines[i].trim();
 		if (!line || line[0] == "#") continue;

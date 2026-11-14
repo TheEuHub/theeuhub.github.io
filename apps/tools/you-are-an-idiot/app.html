@@ -35,6 +35,7 @@ registerApp({
 
     const ctrl = window.__protonIdiotCtrl ||= { stopped: false, seq: 0, timers: new Set() };
     const isClone = !!options.clone;
+    const canPlayMedia = typeof navigator === 'undefined' || !/\bjsdom\b/i.test(navigator.userAgent || '');
     if (!isClone) {
       ctrl.stopped = false;
       document.getElementById('desktop')?.classList.add('idiot-shake');
@@ -51,7 +52,7 @@ registerApp({
       for (const key of [...wins.keys()]) {
         const w = wins.get(key);
         if (w?.appId === 'you-are-an-idiot' || key === 'you-are-an-idiot' || key.startsWith('you-are-an-idiot#')) {
-          try { w.body.querySelector('video')?.pause?.(); } catch {}
+          if (canPlayMedia) { try { w.body.querySelector('video')?.pause?.(); } catch {} }
           closeWin(key, true);
         }
       }
@@ -72,7 +73,7 @@ registerApp({
         <button type="button" class="btn danger" data-stop>Make it stop</button>
       </div>`;
       const vid = body.querySelector('#idiot-app-video');
-      try { vid?.play?.()?.catch?.(() => {}); } catch {}
+      if (canPlayMedia) { try { vid?.play?.()?.catch?.(() => {}); } catch {} }
       const t1 = setTimeout(() => { spawnClone(); spawnClone(); }, 120);
       ctrl.timers.add(t1);
     } else {
@@ -114,7 +115,7 @@ registerApp({
       return false;
     };
     body.onDestroy = () => {
-      try { body.querySelector('video')?.pause?.(); } catch {}
+      if (canPlayMedia) { try { body.querySelector('video')?.pause?.(); } catch {} }
       if (!isClone && ctrl.stopped) {
         document.getElementById('desktop')?.classList.remove('idiot-shake');
       }

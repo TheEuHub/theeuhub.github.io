@@ -47,7 +47,9 @@ registerApp({
 
     const canvas = body.querySelector('#paint-canvas');
     let ctx = null;
-    try { ctx = canvas.getContext('2d'); } catch {}
+    if (typeof navigator === 'undefined' || !/\bjsdom\b/i.test(navigator.userAgent || '')) {
+      try { ctx = canvas.getContext('2d'); } catch {}
+    }
     if (ctx) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);

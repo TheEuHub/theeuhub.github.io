@@ -20,6 +20,12 @@ registerApp({
   /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
    * data/applications.js — edit it there, not here. */
   render(body, options = {}) {
+    const MEDIA_EXTS = [
+      'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'oga', 'opus', 'weba', 'wma',
+      'aif', 'aiff', 'mid', 'midi', 'amr', 'ape', 'ac3', 'mka',
+      'mp4', 'm4v', 'mov', 'webm', 'avi', 'ogv', 'mkv', 'wmv', 'mpg', 'mpeg', '3gp',
+      'flv', 'rm', 'rmvb', 'asf', 'vob', 'ts', 'm2ts', 'mts', 'divx',
+    ];
     const inTab = !!options?.tab;
     const esc = MH.esc;
 
@@ -584,11 +590,13 @@ registerApp({
       setStatus(deinterlace ? 'Deinterlace on' : 'Deinterlace off');
     }
 
-    function cycleProgram(direction = 1) {
+    function cycleProgram(direction) {
+      direction = direction ?? 1;
       setStatus(`Program ${direction > 0 ? 'next' : 'previous'}`);
     }
 
-    function stepTitle(direction = 1) {
+    function stepTitle(direction) {
+      direction = direction ?? 1;
       const titles = player?.chapters?.titles || [];
       if (!titles.length) { setStatus('No titles available'); return; }
       const next = (player.title + direction + titles.length) % titles.length;
@@ -596,7 +604,8 @@ registerApp({
       setStatus(`Title ${next + 1}`);
     }
 
-    function stepChapter(direction = 1) {
+    function stepChapter(direction) {
+      direction = direction ?? 1;
       const chapters = player?.chapters?.chapters || [];
       if (!chapters.length) { setStatus('No chapters available'); return; }
       const next = (player.chapter + direction + chapters.length) % chapters.length;
@@ -737,6 +746,10 @@ registerApp({
       if (key === '=') return done(() => setRateVal(1));
 
       if (!ctrl && !alt && shift && lower === 'v') return done(toggleSubtitles);
+      if (!ctrl && !alt && shift && lower === 'h') return done(() => markSubtitleSync('audio'));
+      if (!ctrl && !alt && shift && lower === 'j') return done(() => markSubtitleSync('subtitle'));
+      if (!ctrl && !alt && shift && lower === 'k') return done(applySubtitleSync);
+      if (ctrl && !alt && shift && lower === 'v') return done(() => cycleSubtitleTrack(-1));
       if (!ctrl && !alt && !shift) {
         switch (lower) {
           case 'b': return done(cycleAudioTrack);

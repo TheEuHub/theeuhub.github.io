@@ -24,15 +24,17 @@
     }).catch(() => {});
   }
 
-  /* Restore read-only account context so FS.readBlob() sees the user's VFS. */
-  if (typeof MH !== 'undefined') {
+  /* Restore account context so FS.readBlob() sees the user's VFS. */
+  if (typeof MH !== 'undefined' && !window.userData) {
     const accounts = MH.accounts();
-    if (userParam && accounts[userParam]) {
-      window.currentUser = accounts[userParam];
-      window.userData = MH.loadData(userParam, accounts[userParam].displayName || accountParam || userParam);
+    const acc = userParam && accounts[userParam];
+    const display = (acc && acc.displayName) || accountParam || userParam || 'user';
+    if (acc) {
+      window.currentUser = acc;
+      window.userData = MH.loadJSON(MH.userKey(userParam), MH.defaultData(display, userParam));
     } else if (userParam) {
-      window.currentUser = { username: accountParam || userParam, usernameLower: userParam, displayName: accountParam || userParam };
-      window.userData = MH.loadData(userParam, accountParam || userParam);
+      window.currentUser = { username: display, usernameLower: userParam, displayName: display };
+      window.userData = MH.loadJSON(MH.userKey(userParam), MH.defaultData(display, userParam));
     }
   }
 

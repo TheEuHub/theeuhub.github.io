@@ -167,7 +167,7 @@ registerApp({
       nanoDirty = false;
       nanoDirtyEl.textContent = '';
       const lines = nanoTa.value === '' ? 0 : nanoTa.value.split('\n').length;
-      const note = `Wrote ${lines} line${lines === 1 ? '' : 's'} to ${prettyPath(nanoPath)}`;
+      const note = `Wrote ${lines} lines to ${prettyPath(nanoPath)}`;
       nanoMsg.textContent = note;
       print(note);
     };
@@ -310,7 +310,7 @@ registerApp({
                 print('rm: Directory not empty');
                 continue;
               }
-              FS.remove(target);
+              FS.rm(target, '/', rec);
             }
             break;
           }
@@ -329,7 +329,7 @@ registerApp({
             const src = resolveArg(args[0]);
             let dst = resolveArg(args[1]);
             if (FS.isDir(dst)) dst = FS.join(dst, FS.basename(src));
-            await FS.move(src, dst);
+            FS.rename(src, dst);
             break;
           }
           case 'stat': {

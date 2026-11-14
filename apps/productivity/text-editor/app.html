@@ -162,7 +162,7 @@ registerApp({
     fileInput.onchange = async () => {
       const file = fileInput.files?.[0];
       if (!file) return;
-      textEl.value = await file.text();
+      textEl.value = file.text ? await file.text() : await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.onerror = () => rej(r.error); r.readAsText(file); });
       currentPath = '';
       readOnlyFile = false;
       savedText = textEl.value;

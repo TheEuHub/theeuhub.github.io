@@ -58,9 +58,9 @@ export class VlcPlayerElement extends HTMLElement {
         <button class="play" aria-label="Play">▶</button>
         <input class="seek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Seek">
         <span class="time">0:00 / 0:00</span>
-        <button class="mute" aria-label="Mute">🔊</button>
+        <button class="mute" aria-label="Mute">Volume</button>
         <input class="vol" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
-        <button class="fs" aria-label="Fullscreen">⛶</button>
+        <button class="fs" aria-label="Fullscreen">Full</button>
       </div>`;
     const $ = (s) => root.querySelector(s);
     this.#ui = { canvas: $('canvas'), msg: $('.msg'), bar: $('.bar'), play: $('.play'), seek: $('.seek'), time: $('.time'), mute: $('.mute'), vol: $('.vol'), fs: $('.fs') };
@@ -170,7 +170,7 @@ export class VlcPlayerElement extends HTMLElement {
   #wire(p) {
     const u = this.#ui;
     p.on('statechange', (s) => {
-      u.play.textContent = s === 'playing' ? '❚❚' : '▶';
+      u.play.textContent = s === 'playing' ? '\u275A\u275A' : '\u25B6';
       u.play.setAttribute('aria-label', s === 'playing' ? 'Pause' : 'Play');
       if (s === 'playing') this.#fire('playing');
       if (s === 'paused') this.#fire('pause');
@@ -182,7 +182,7 @@ export class VlcPlayerElement extends HTMLElement {
     p.on('error', (e) => { this.#message(e.message); this.#fire('error', { error: e }); });
     p.on('volumechange', ({ volume, muted }) => {
       u.vol.value = volume;
-      u.mute.textContent = muted || volume === 0 ? '🔇' : '🔊';
+      u.mute.textContent = muted || volume === 0 ? '\uD83D\uDD07' : '\uD83D\uDD0A';
       this.#fire('volumechange');
     });
     p.on('ratechange', () => this.#fire('ratechange'));

@@ -87,7 +87,7 @@ registerApp({
       img.alt = currentName;
       img.style.display = 'block';
       dlBtn.disabled = false;
-      note.textContent = `${currentName} (${MH.bytes(blob.size || 0)})`;
+      note.textContent = `${currentName} (${MH.fmtBytes(blob.size || 0)})`;
       applyZoom();
     };
 

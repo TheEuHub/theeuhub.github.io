@@ -13,6 +13,7 @@ proton menu. The script below is fetched and run by proton's HTML loader
 <!-- proton app: everything that registers and renders this app lives in
      this one script block. Edit it, then reload proton. -->
 <script data-proton-app>
+(() => {
 'use strict';
 
 const GAME_PAGE = 'apps/games/five-nights-at-freddys-3/index.html';
@@ -31,6 +32,7 @@ registerApp({
     };
   },
 });
+})();
 </script>
 </body>
 </html>

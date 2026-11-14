@@ -59,9 +59,9 @@ registerApp({
     }
 
     const home = FS.home();
-    let cwd = home;
+    let cwd = options.path ? FS.normalize(options.path) : home;
     let viewMode = 'list';
-    let selected = new Set();
+    let selected = options.select ? new Set([FS.normalize(options.select)]) : new Set();
     let searchQuery = '';
     let searchHits = null;
     let askState = null;
@@ -241,8 +241,8 @@ registerApp({
           btn.className = (viewMode === 'grid' ? 'fm-tile' : 'fm-row') + (selected.has(item.path) ? ' sel' : '');
           btn.dataset.path = item.path;
           btn.draggable = true;
-          const icName = item.type === 'dir' ? 'folder' : (FS.mediaKind?.(item.path) === 'image' ? 'image' : FS.ext(item.path) === '.pdf' ? 'book' : 'file-text');
-          const sizeLabel = item.type === 'dir' ? 'Folder' : MH.bytes(item.size || 0);
+          const icName = item.type === 'dir' ? 'folder' : (FS.mediaKind?.(item.path) === 'image' ? 'image' : FS.extname(item.path) === 'pdf' ? 'book' : 'file-text');
+          const sizeLabel = item.type === 'dir' ? 'Folder' : MH.fmtBytes(item.size || 0);
           btn.innerHTML = viewMode === 'grid'
             ? `${iconSvg(icName)}<span class="fm-name">${MH.esc(item.name)}</span><span class="muted" style="font-size:11px">${MH.esc(sizeLabel)}</span>`
             : `${iconSvg(icName)}<span class="fm-name">${MH.esc(searchHits !== null ? item.path : item.name)}</span><span class="fm-meta">${MH.esc(sizeLabel)}</span>`;
@@ -282,7 +282,7 @@ registerApp({
       scrollEl.innerHTML = '';
       scrollEl.appendChild(container);
 
-      const counts = FS.homeStats();
+      const counts = FS.count();
       const parts = [];
       if (selected.size) parts.push(`Selected ${selected.size}`);
       if (!writable) parts.push('read-only');
@@ -364,7 +364,7 @@ registerApp({
       addBtn('Move to…', () => {
         showAsk('Move to folder:', FS.dirname(item.path), async (destDir) => {
           const dest = FS.join(FS.normalize(destDir), item.name);
-          await FS.move(item.path, dest);
+          FS.rename(item.path, dest);
         }, true);
       }, !wItem);
       addBtn('Copy to…', () => {
@@ -376,11 +376,11 @@ registerApp({
       addBtn('Download', () => downloadPaths([item.path]));
       addBtn('Properties', () => {
         const st = FS.stat(item.path);
-        MH.toast(`${item.name} · ${st?.type === 'dir' ? 'Folder' : MH.bytes(st?.size || 0)} · ${st?.readonly ? 'read-only' : 'writable'}`);
+        MH.toast(`${item.name} · ${st?.type === 'dir' ? 'Folder' : MH.fmtBytes(st?.size || 0)} · ${st?.readonly ? 'read-only' : 'writable'}`);
       });
       addBtn('Delete', () => {
         if (!window.confirm(`Delete "${item.name}"?`)) return;
-        FS.remove(item.path);
+        FS.rm(item.path, '/', true);
       }, !wItem);
 
       body.appendChild(menu);
@@ -466,10 +466,10 @@ registerApp({
       if (!files.length) return;
       for (const file of files) {
         const target = FS.join(cwd, file.name);
-        if (FS.BINARY_EXT?.has(FS.ext(file.name))) {
+        if (FS.BINARY_EXT?.has(FS.extname(file.name))) {
           await FS.writeBlob(target, file);
         } else {
-          const text = await file.text();
+          const text = file.text ? await file.text() : await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '')); r.onerror = () => rej(r.error); r.readAsText(file); });
           FS.write(target, text);
         }
       }
@@ -493,7 +493,7 @@ registerApp({
     });
 
     body.openPath = (opts = {}) => {
-      if (opts.path) navigate(opts.path);
+      if (opts.path) navigate(opts.path, opts.select || null);
     };
 
     body.onDestroy = () => {
@@ -501,7 +501,7 @@ registerApp({
       closeMenu();
     };
 
-    if (options.path) navigate(options.path);
+    if (options.path) navigate(options.path, options.select || null);
     else render();
   },
 });
