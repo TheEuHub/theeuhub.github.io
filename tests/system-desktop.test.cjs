@@ -3513,3 +3513,59 @@ test('the AI button docks Mox beside the desktop, like Copilot on Windows', asyn
     assert.deepEqual(errors, []);
   } finally { close(); }
 });
+
+test('Mari0 switches active portal color on Q and shoots it on left or right click', () => {
+  const zlib = require('node:zlib');
+  const dataBuf = fs.readFileSync(path.join(ROOT, 'apps/games/mari0/game.data'));
+  const gameJs = source('apps/games/mari0/game.js');
+  const indexHtml = source('apps/games/mari0/index.html');
+
+  const pkgMatch = gameJs.match(/loadPackage\((\{[\s\S]*?\})\);/);
+  assert.ok(pkgMatch, 'game.js must declare loadPackage metadata');
+  const meta = JSON.parse(pkgMatch[1]);
+  assert.equal(meta.remote_package_size, dataBuf.length, 'game.js remote_package_size must match game.data');
+  assert.equal(meta.files[0].end, dataBuf.length, 'game.js /game.love slice end must match game.data');
+  assert.notEqual(meta.package_uuid, '580c638c-82cb-4f22-9cad-8285d1bc7519',
+    'package_uuid must rotate so IndexedDB cache loads updated game.data');
+
+  function readZipEntry(zipBuf, name) {
+    let eocd = -1;
+    for (let i = zipBuf.length - 22; i >= Math.max(0, zipBuf.length - 65558); i--) {
+      if (zipBuf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+    }
+    assert.ok(eocd !== -1, 'game.data should have a valid ZIP end-of-central-directory');
+    let off = zipBuf.readUInt32LE(eocd + 16);
+    const total = zipBuf.readUInt16LE(eocd + 10);
+    for (let idx = 0; idx < total; idx++) {
+      assert.equal(zipBuf.readUInt32LE(off), 0x02014b50, 'invalid central directory header');
+      const method = zipBuf.readUInt16LE(off + 10);
+      const compSize = zipBuf.readUInt32LE(off + 20);
+      const nameLen = zipBuf.readUInt16LE(off + 28);
+      const extraLen = zipBuf.readUInt16LE(off + 30);
+      const commentLen = zipBuf.readUInt16LE(off + 32);
+      const localOff = zipBuf.readUInt32LE(off + 42);
+      const entryName = zipBuf.toString('utf8', off + 46, off + 46 + nameLen);
+      off += 46 + nameLen + extraLen + commentLen;
+      if (entryName !== name) continue;
+      assert.equal(zipBuf.readUInt32LE(localOff), 0x04034b50, `invalid local header for ${name}`);
+      const lNameLen = zipBuf.readUInt16LE(localOff + 26);
+      const lExtraLen = zipBuf.readUInt16LE(localOff + 28);
+      const dataStart = localOff + 30 + lNameLen + lExtraLen;
+      const slice = zipBuf.subarray(dataStart, dataStart + compSize);
+      return (method === 0 ? slice : zlib.inflateRawSync(slice)).toString('utf8');
+    }
+    assert.fail(`missing ${name} in apps/games/mari0/game.data`);
+  }
+
+  const marioLua = readZipEntry(dataBuf, 'mario.lua');
+  const gameLua = readZipEntry(dataBuf, 'game.lua');
+
+  assert.match(marioLua, /\bself\.selectedportal\s*=\s*1\b/);
+  assert.match(marioLua, /function mario:updateangle\(mx,\s*my\)/);
+  assert.match(gameLua, /if key == "q" then[\s\S]*?selectedportal = \(target\.selectedportal == 2\) and 1 or 2/);
+  assert.match(gameLua, /if button == 1 or button == 2 then[\s\S]*?v:updateangle\(x,\s*y\)[\s\S]*?if playertype == "portal" then[\s\S]*?playerportalbutton\(mouseowner,\s*v\.selectedportal or 1\)/);
+  assert.match(gameLua, /activeportal = objects\["player"\]\[pl\]\.selectedportal or 1/);
+  assert.match(indexHtml, /L\/R Click/);
+  assert.match(indexHtml, /Switch Color: Q/);
+});
+

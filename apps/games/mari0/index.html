@@ -19,10 +19,10 @@
 <body>
   <div class="bar">
     <a href="../">All games</a>
-    <span>Move: WASD / Arrows · Jump: Space · Aim &amp; Portals: Mouse</span>
+    <span>Move: WASD / Arrows · Jump: Space · Aim &amp; Shoot Portal: L/R Click · Switch Color: Q</span>
     <button type="button" onclick="goFullScreen()">Fullscreen</button>
   </div>
-  <div class="stage">
+  <div class="stage" oncontextmenu="event.preventDefault()">
     <canvas id="loadingCanvas" oncontextmenu="event.preventDefault()" width="800" height="600"></canvas>
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
   </div>
