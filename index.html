@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OldOS — iOS 4, Fully Rebuilt in HTML5 · The OldOS Project for the Web</title>
+<meta name="description" content="The OldOS Project — the pixel-perfect recreation of iOS 4 — completely rebuilt in HTML5. Slide to unlock, launch Maps, play iPod, surf the web in Safari. Every app works, right in your browser. Static, open source, and forever free.">
+<meta name="theme-color" content="#0a0c12">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/img/favicon-64.png">
+<link rel="icon" type="image/png" sizes="180x180" href="assets/img/favicon.png">
+<link rel="apple-touch-icon" href="assets/img/favicon.png">
+<meta property="og:title" content="OldOS — iOS 4, Fully Rebuilt in HTML5">
+<meta property="og:description" content="The famous OldOS Project, recreated pixel-for-pixel in your browser. Slide to unlock and actually use it.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://theeuhub.github.io/assets/img/Header.jpg">
+<link rel="canonical" href="https://theeuhub.github.io/">
+<link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/ios.css">
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<nav class="site-nav" id="siteNav">
+  <a class="nav-brand" href="#top" aria-label="OldOS home">
+    <span class="brand-badge"><img src="assets/img/favicon-64.png" alt="OldOS icon" width="28" height="28"></span>
+    <span class="brand-type">OldOS<em>web edition</em></span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#apps">Apps</a>
+    <a href="#screenshots">Screenshots</a>
+    <a href="#source">Source</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a class="nav-gh" href="https://github.com/TheEuHub/theeuhub.github.io" target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub
+  </a>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<header class="hero" id="top">
+  <div class="aurora aurora-1"></div>
+  <div class="aurora aurora-2"></div>
+  <div class="aurora aurora-3"></div>
+  <div class="hero-grain"></div>
+
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-dot"></span>THE OLD OS PROJECT, REBORN · v2.0 (9)</p>
+      <h1 class="hero-title">iOS&nbsp;4,<br>rebuilt<br>in&nbsp;<span class="title-accent">HTML5.</span></h1>
+      <p class="hero-sub">The internet’s favourite pixel-perfect love letter to iOS 4 — the one zzanehip wrote in SwiftUI — recreated <strong>line for line in HTML, CSS &amp; JavaScript</strong>. Slide to unlock. Surf the web in Safari. Play synthesized chiptunes in iPod. All 22 apps, live in your browser.</p>
+
+      <div class="hero-ctas">
+        <button class="btn btn-primary" id="ctaUnlock">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+          Slide to Unlock
+        </button>
+        <a class="btn btn-ghost" href="https://github.com/zzanehip/The-OldOS-Project" target="_blank" rel="noopener">
+          Original repo
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+        </a>
+      </div>
+
+      <div class="hero-stats" aria-label="Project stats">
+        <div class="stat"><b>87</b><span>commits of obsession</span></div>
+        <div class="stat"><b>3.6k</b><span>stars on the original</span></div>
+        <div class="stat"><b>22</b><span>apps, all functional</span></div>
+        <div class="stat"><b>0</b><span>build steps — it’s static</span></div>
+      </div>
+    </div>
+
+    <!-- ════════ PHONE ════════ -->
+    <div class="hero-stage" id="heroStage">
+      <div class="phone-platform"></div>
+      <div class="phone-scale" id="phoneScale">
+        <div class="iphone4" id="iphone4" role="application" aria-label="OldOS, a pixel-perfect recreation of iOS 4">
+          <!-- side buttons -->
+          <button class="side-btn side-power" id="powerBtn" aria-label="Lock / wake"></button>
+          <span class="side-btn side-mute" aria-hidden="true"></span>
+          <span class="side-btn side-vol-up" aria-hidden="true"></span>
+          <span class="side-btn side-vol-down" aria-hidden="true"></span>
+
+          <div class="phone-body">
+            <div class="face-top" aria-hidden="true">
+              <span class="sensor-dot sensor-light"></span>
+              <span class="earpiece"></span>
+              <span class="sensor-dot sensor-cam"></span>
+            </div>
+
+            <div class="screen-bezel">
+              <!-- ════════ SCREEN (320 × 480) ════════ -->
+              <div class="screen" id="screen">
+                <div class="wallpaper" id="wallpaper"></div>
+
+                <!-- boot -->
+                <div class="boot-view" id="bootView" aria-hidden="true">
+                  <div class="boot-wordmark">OldOS</div>
+                  <div class="boot-bar"><div class="boot-bar-fill" id="bootBarFill"></div></div>
+                </div>
+
+                <!-- status bar -->
+                <div class="statusbar" id="statusbar" aria-hidden="true">
+                  <div class="sb-side sb-left">
+                    <span class="sb-airplane" id="sbAirplane">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M21.5 2.5l-9 19a.6.6 0 0 1-1.14-.02l-2.06-7.12a.6.6 0 0 0-.4-.4l-7.12-2.06a.6.6 0 0 1-.02-1.14l19-9a.6.6 0 0 1 .74.74z"/></svg>
+                    </span>
+                    <span class="sb-bars" id="sbBars"><i></i><i></i><i></i><i></i><i></i></span>
+                    <span class="sb-carrier" id="sbCarrier">TheEuHub</span>
+                    <span class="sb-wifi" id="sbWifi">
+                      <svg viewBox="0 0 16 12" width="15" height="12" fill="currentColor"><path d="M8 11.6a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM8 6.4c-1.5 0-2.9.6-3.9 1.6l1.6 1.6A3.3 3.3 0 0 1 8 8.5c.9 0 1.7.4 2.3 1.1l1.6-1.6A5.4 5.4 0 0 0 8 6.4zM8 2C5.4 2 3 3.1 1.1 4.9l1.6 1.6A7.8 7.8 0 0 1 8 4c2 0 3.9.8 5.3 2.4l1.6-1.6A10.4 10.4 0 0 0 8 2z"/></svg>
+                    </span>
+                  </div>
+                  <div class="sb-time" id="sbTime">9:41 AM</div>
+                  <div class="sb-side sb-right">
+                    <span class="sb-batt-pct" id="sbBattPct">100%</span>
+                    <span class="sb-battery" id="sbBattery"><span class="sb-batt-fill" id="sbBattFill"></span><i class="sb-batt-cap"></i></span>
+                  </div>
+                </div>
+
+                <!-- lock screen -->
+                <section class="lockscreen" id="lockScreen" aria-label="Lock screen">
+                  <div class="ls-clockwrap">
+                    <div class="ls-time" id="lsTime">9:41</div>
+                    <div class="ls-date" id="lsDate">Friday, November 14</div>
+                  </div>
+                  <div class="ls-bottom">
+                    <div class="slide-track" id="slideTrack" aria-label="Slide to unlock">
+                      <div class="slide-text" id="slideHint">slide to unlock</div>
+                      <div class="slide-knob" id="slideKnob" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" aria-label="Slide to unlock">
+                        <svg viewBox="0 0 20 28" width="18" height="26" aria-hidden="true"><path d="M4 3l12 11-12 11" fill="none" stroke="#6f7276" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </div>
+                    </div>
+                    <button class="ls-grabber" id="cameraGrabber" aria-label="Open camera">
+                      <svg viewBox="0 0 24 18" width="22" height="17" fill="currentColor" aria-hidden="true"><path d="M8.2 1L6.7 3.4H3.4A2.4 2.4 0 0 0 1 5.8v8.8a2.4 2.4 0 0 0 2.4 2.4h17.2a2.4 2.4 0 0 0 2.4-2.4V5.8a2.4 2.4 0 0 0-2.4-2.4h-3.3L15.8 1H8.2zm3.8 13.2A4.7 4.7 0 1 1 16.7 9.5 4.7 4.7 0 0 1 12 14.2z"/><circle cx="12" cy="9.5" r="3.4" fill="#1b1b1e"/></svg>
+                    </button>
+                  </div>
+                </section>
+
+                <!-- passcode -->
+                <section class="passcode" id="passcodeScreen" hidden aria-label="Passcode">
+                  <div class="pc-title" id="pcTitle">Enter Passcode</div>
+                  <div class="pc-dots" id="pcDots"><i></i><i></i><i></i><i></i></div>
+                  <div class="pc-keypad" id="pcKeypad"></div>
+                  <div class="pc-actions">
+                    <button class="pc-link" id="pcForgot">Forgot passcode?</button>
+                    <button class="pc-link" id="pcEmergency">Emergency Call</button>
+                  </div>
+                </section>
+
+                <!-- springboard -->
+                <section class="springboard" id="springboard" aria-label="Home screen">
+                  <div class="pages-viewport" id="pagesViewport">
+                    <div class="pages-track" id="pagesTrack">
+                      <div class="sb-page spotlight-page" id="spotlightPage">
+                        <div class="spotlight-box">
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#8e9299" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.8"/><path d="M15.8 15.8L21 21"/></svg>
+                          <input type="text" id="spotlightInput" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search apps">
+                          <button class="spot-cancel" id="spotlightClear" aria-label="Clear search">×</button>
+                        </div>
+                        <div class="spotlight-hint" id="spotlightHint">Search your apps, the web, and Wikipedia.</div>
+                        <div class="spotlight-results" id="spotlightResults"></div>
+                      </div>
+                      <div class="sb-page icons-page" data-page="0" id="page0"></div>
+                      <div class="sb-page icons-page" data-page="1" id="page1"></div>
+                    </div>
+                  </div>
+                  <div class="paging-row">
+                    <button class="spotlight-jump" id="spotlightJump" aria-label="Search">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#cfd3d8" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.8"/><path d="M15.8 15.8L21 21"/></svg>
+                    </button>
+                    <div class="page-dots" id="pageDots"></div>
+                    <span class="paging-spacer" aria-hidden="true"></span>
+                  </div>
+                  <div class="dock" id="dock"></div>
+                </section>
+
+                <!-- app host -->
+                <div class="app-layer" id="appLayer"></div>
+
+                <!-- multitasking tray (double-tap Home) -->
+                <div class="multitask" id="multitaskTray" aria-hidden="true">
+                  <div class="multitask-hint">Double-click Home to toggle</div>
+                  <div class="multitask-inner">
+                    <div class="multitask-icons" id="multitaskIcons"></div>
+                    <div class="multitask-sep"></div>
+                    <div class="multitask-note">
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+                      <span id="multitaskNowPlaying">iPod · Not Playing</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- banner -->
+                <div class="banner" id="banner" role="status">
+                  <div class="banner-title" id="bannerTitle">OldOS</div>
+                  <div class="banner-body" id="bannerBody">Welcome back.</div>
+                </div>
+
+                <!-- editing bar -->
+                <div class="editing-bar" id="editingBar" hidden>
+                  <span>Jiggle mode — tap × to remove</span>
+                  <button id="doneEditingBtn">Done</button>
+                </div>
+
+                <div class="brightness-dim" id="brightnessDim" aria-hidden="true"></div>
+              </div>
+              <!-- ═══ /SCREEN ═══ -->
+            </div>
+
+            <div class="face-bottom">
+              <button class="home-button" id="homeButton" aria-label="Home button"><span class="home-glyph" aria-hidden="true"></span></button>
+            </div>
+            <div class="glass-shine" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-actions">
+        <button class="stage-btn" id="fullscreenBtn">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          Fullscreen
+        </button>
+        <button class="stage-btn" id="resetPhoneBtn" title="Reset the demo phone">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          Reset Phone
+        </button>
+        <span class="stage-hint">Drag the slider · double-click Home · hold icons to jiggle</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-scroll cue" aria-hidden="true">
+    <span class="cue-line"></span>SCROLL
+  </div>
+</header>
+
+<!-- ══════════ MARQUEE ══════════ -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="marqueeTrack">
+    <span>SLIDE&nbsp;TO&nbsp;UNLOCK&nbsp;&nbsp;·&nbsp;&nbsp;I&nbsp;LOVE&nbsp;YOU&nbsp;THIS&nbsp;OS&nbsp;&nbsp;·&nbsp;&nbsp;PIXEL-PERFECT&nbsp;&nbsp;·&nbsp;&nbsp;100%&nbsp;CLIENT-SIDE&nbsp;&nbsp;·&nbsp;&nbsp;OPEN&nbsp;SOURCE&nbsp;&nbsp;·&nbsp;&nbsp;NO&nbsp;BUILD&nbsp;STEP&nbsp;&nbsp;·&nbsp;&nbsp;iOS&nbsp;4&nbsp;FOREVER&nbsp;&nbsp;·&nbsp;&nbsp;</span>
+  </div>
+</div>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section class="section features" id="features">
+  <div class="section-head">
+    <p class="eyebrow small"><span class="eyebrow-dot amber"></span>WHY IT MATTERS</p>
+    <h2>A museum you can <em>actually use</em>.</h2>
+    <p class="section-sub">Not a mock-up. Not screenshots. The whole OS — boot, lock, springboard, multitasking dock, apps — reimplemented in the browser with the same fanatical attention to detail as the original SwiftUI build.</p>
+  </div>
+
+  <div class="feature-grid">
+    <article class="feature-card">
+      <div class="feature-num">01</div>
+      <div class="feature-icon lock"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="10.5" width="16" height="9.5" rx="2.4"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7"/></svg></div>
+      <h3>Slide to Unlock</h3>
+      <p>The shimmer, the knob, the bounce-back. Even the lock screen camera grabber works — drag it upward to snap straight into the viewfinder.</p>
+    </article>
+
+    <article class="feature-card">
+      <div class="feature-num">02</div>
+      <div class="feature-icon grid"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><rect x="3" y="3" width="7.6" height="7.6" rx="1.8"/><rect x="13.4" y="3" width="7.6" height="7.6" rx="1.8"/><rect x="3" y="13.4" width="7.6" height="7.6" rx="1.8"/><rect x="13.4" y="13.4" width="7.6" height="7.6" rx="1.8"/></svg></div>
+      <h3>The Real Springboard</h3>
+      <p>Icon pagination, a Working Utilities folder, page dots, Spotlight search (swipe right), and long-press jiggle mode for your downloaded apps.</p>
+    </article>
+
+    <article class="feature-card">
+      <div class="feature-num">03</div>
+      <div class="feature-icon bars"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17h16M6.5 14.5l3-7 4 5 3.2-8.5L21 11"/></svg></div>
+      <h3>Live Data, Live Radio</h3>
+      <p>Real weather from open-meteo, quotes via stooq, maps you can pan, and a Web Audio synthesizer performing chiptunes inside iPod.</p>
+    </article>
+
+    <article class="feature-card">
+      <div class="feature-num">04</div>
+      <div class="feature-icon layers"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg></div>
+      <h3>iOS 4 Multitasking</h3>
+      <p>Double-click the Home button and the felt multitasking tray slides up — switch between recent apps and pause the music from anywhere.</p>
+    </article>
+
+    <article class="feature-card">
+      <div class="feature-num">05</div>
+      <div class="feature-icon mic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 12a6.5 6.5 0 0 0 13 0M12 18.5V21"/></svg></div>
+      <h3>Hardware-Grade APIs</h3>
+      <p>Voice Memos records into IndexedDB, Camera snaps to the Camera Roll, Compass reads deviceorientation, DTMF tones ring from a real keypad matrix.</p>
+    </article>
+
+    <article class="feature-card">
+      <div class="feature-num">06</div>
+      <div class="feature-icon wifi"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 9.5a13.5 13.5 0 0 1 18 0M6.5 13.5a9 9 0 0 1 11 0M10 17.2a4.3 4.3 0 0 1 4 0"/><circle cx="12" cy="20.2" r="1.15" fill="currentColor" stroke="none"/></svg></div>
+      <h3>Stateful &amp; Persistent</h3>
+      <p>Settings stick. Notes persist. Badges clear. Wallpapers stay picked. Airplane mode really drops the bars. Reset it all from Settings → General.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ══════════ APP GRID ══════════ -->
+<section class="section apps" id="apps">
+  <div class="section-head">
+    <p class="eyebrow small"><span class="eyebrow-dot green"></span>THE HOME SCREEN</p>
+    <h2>Every icon. <em>Every app.</em></h2>
+    <p class="section-sub">Work through the originals: Messages with a stubborn chatbot, Mail with a “Check for Mail” button, Phone with DTMF, Clock with live world faces, and an App Store that actually installs icons onto your springboard.</p>
+  </div>
+  <div class="apps-grid" id="appsGrid"></div>
+</section>
+
+<!-- ══════════ SCREENSHOTS ══════════ -->
+<section class="section shots" id="screenshots">
+  <div class="section-head">
+    <p class="eyebrow small"><span class="eyebrow-dot blue"></span>MUSEUM OF 2010</p>
+    <h2>Original marketing, <em>preserved.</em></h2>
+    <p class="section-sub">The screenshots Apple-styled the project with, kept here as a gallery — plus the actual interface you’re holding above, rendered live.</p>
+  </div>
+  <div class="shots-rail" id="shotsRail"></div>
+</section>
+
+<!-- ══════════ SOURCE / RELEASES ══════════ -->
+<section class="section source" id="source">
+  <div class="section-head">
+    <p class="eyebrow small"><span class="eyebrow-dot red"></span>OPEN SOURCE, ALWAYS</p>
+    <h2>Credit where it’s due.</h2>
+    <p class="section-sub">OldOS was created by <a href="https://github.com/zzanehip" target="_blank" rel="noopener">@zzanehip</a> (Zane) as a SwiftUI recreation of iOS 4. The project is licensed under Creative Commons Attribution 4.0 — attribution is the deal, the web is the medium.</p>
+  </div>
+
+  <div class="source-grid">
+    <a class="source-card" href="https://github.com/zzanehip/The-OldOS-Project" target="_blank" rel="noopener">
+      <span class="source-tag">THE ORIGINAL · SWIFTUI</span>
+      <h3>The-OldOS-Project</h3>
+      <p>zzanehip’s open-source SwiftUI build — iOS 4 rebuilt for modern devices, including iOS 26 support in v2.0.</p>
+      <span class="source-link">github.com/zzanehip/The-OldOS-Project
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+      </span>
+    </a>
+    <a class="source-card highlight" href="https://github.com/TheEuHub/theeuhub.github.io" target="_blank" rel="noopener">
+      <span class="source-tag">THIS RECREATION · HTML5</span>
+      <h3>TheEuHub / theeuhub.github.io</h3>
+      <p>The static-site reimplementation you’re using right now. Fork it, learn it, ship your own decade.</p>
+      <span class="source-link">github.com/TheEuHub/theeuhub.github.io
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+      </span>
+    </a>
+    <a class="source-card" href="https://github.com/zzanehip/The-OldOS-Project/releases" target="_blank" rel="noopener">
+      <span class="source-tag">RELEASES · IPA</span>
+      <h3>Version 2.0 (9)</h3>
+      <p>Clock, Calculator, homescreen overhaul and compilation fixes. Download the IPA if you’d rather hold the real thing.</p>
+      <span class="source-link">github.com/zzanehip/The-OldOS-Project/releases
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+      </span>
+    </a>
+  </div>
+
+  <div class="license-bar">
+    <span class="license-badge">CC BY 4.0</span>
+    <p>OldOS and its artwork are the work of zzanehip and contributors, licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">Creative Commons Attribution 4.0</a>. This site is an attribution-respecting fan recreation of that work. Apple, iPhone, and iOS are trademarks of Apple Inc. — who have nothing to do with this and whose 2010 HR department probably peaked with the iPhone 4.</p>
+  </div>
+</section>
+
+<!-- ══════════ FAQ ══════════ -->
+<section class="section faq" id="faq">
+  <div class="section-head">
+    <p class="eyebrow small"><span class="eyebrow-dot amber"></span>QUESTIONS</p>
+    <h2>Before you slide.</h2>
+  </div>
+  <div class="faq-list">
+    <details class="faq-item" open>
+      <summary>Does it actually work, or is it a screenshot?<span class="faq-chev"></span></summary>
+      <p>Genuinely works. The lock screen drag physics, the springboard paging, the Utilities folder, the DTMF-capable keypad, a real calculator, a real stopwatch, notes that persist, Photos that include your Camera shots, weather pulled live from open-meteo, stock quotes from stooq — it’s all running as you read this. Safari really navigates the web (in an iframe), and Voice Memos really records to IndexedDB.</p>
+    </details>
+    <details class="faq-item">
+      <summary>What survives a refresh?<span class="faq-chev"></span></summary>
+      <p>Everything local: your wallpaper, brightness, airplane mode, Wi-Fi pick, passcode (if you set one), notes, mail you sent, read state, photos you took, voice memos, alarms, contacts you edited, App Store installs, and springboard jiggle-state. Server-side: nothing. There is no server. There is no backend. There is only the 2010 dream.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Why does Safari sometimes refuse to load a page?<span class="faq-chev"></span></summary>
+      <p>Some sites send <code>X-Frame-Options</code> headers forbidding iframes. When that happens, tap “Open in New Tab” — the address bar still works, and Wikipedia, Hacker News, Example.com and Apache.org embed beautifully. This is a web platform limitation, not an OldOS limitation.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Is this affiliated with Apple or zzanehip?<span class="faq-chev"></span></summary>
+      <p>No to both — this is an affectionate, attribution-respecting fan recreation hosted by TheEuHub on GitHub Pages. All credit for the concept, art direction, and original build goes to Zane and the OldOS contributors. All blame for the CSS goes to this site.</p>
+    </details>
+    <details class="faq-item">
+      <summary>Can I run this offline?<span class="faq-chev"></span></summary>
+      <p>Save the page, or clone the repo — it’s a static site. iPod music is synthesized live via Web Audio (no files needed), maps and Wikipedia need network, and everything else works with the Wi-Fi switched off — the bars will even tell you.</p>
+    </details>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="assets/img/favicon-64.png" alt="" width="36" height="36">
+      <div>
+        <b>OldOS · Web Edition</b>
+        <span>A static-site love letter to iOS 4, by TheEuHub</span>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/zzanehip/The-OldOS-Project" target="_blank" rel="noopener">Original Project</a>
+      <a href="https://github.com/TheEuHub/theeuhub.github.io" target="_blank" rel="noopener">This Site</a>
+      <a href="https://github.com/zzanehip/The-OldOS-Project/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>
+    </div>
+    <p class="footer-fine">Not affiliated with Apple Inc. Artwork © zzanehip and contributors, used under CC BY 4.0. Code for this recreation is free for the same. Crafted with HTML5, CSS3, Web Audio, Geolocation, IndexedDB and an unreasonable fondness for 2010. © 2026 TheEuHub.</p>
+  </div>
+</footer>
+
+<!-- ══════════ FULLSCREEN OVERLAY ══════════ -->
+<div class="fullscreen-overlay" id="fullscreenOverlay" hidden aria-hidden="true" role="dialog" aria-label="OldOS fullscreen demo">
+  <button class="fs-close" id="fsClose" aria-label="Exit fullscreen">✕</button>
+  <span class="fs-hint">Press Esc or Home-double-tap your way home</span>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/apps-a.js"></script>
+<script src="js/apps-b.js"></script>
+<script src="js/apps-c.js"></script>
+<script src="js/apps-d.js"></script>
+<script src="js/apps-e.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
