@@ -1013,63 +1013,57 @@ test('the desktop boots, lists and opens all catalogued apps', async () => {
     assert.equal(shown(), '0', 'Escape clears');
     w.closeWin('calculator', true);
 
-    // Web Retro's front page is two tabs in the desktop's own style:
-    // ROMs — four console boxes (NES, SNES, N64, GB), each bringing up
-    // that console's bundled games with their poster art — and
-    // Emulators, the same console boxes, where picking one opens a
-    // "where from?" screen (proton Files or this computer; back arrow).
+    // Web Retro includes no preinstalled ROMs: its chooser lets users
+    // load their own ROMs via quick-load / drag-and-drop (auto-detecting
+    // the core) or by picking one of the four console systems first, then
+    // choosing proton Files or This computer.
     w.openApp('web-retro');
     const retro = wins.get('web-retro').body;
-    const tabBtns = [...retro.querySelectorAll('[data-wr-tab]')];
-    assert.deepEqual(tabBtns.map((b) => b.textContent.trim()), ['ROMs', 'Emulators'],
-      'the front page should be two clickable tabs');
-    assert.equal(retro.querySelector('#wr-roms').hidden, false, 'the ROMs tab starts open');
-    assert.equal(retro.querySelector('#wr-emulators').hidden, true, 'the Emulators tab starts closed');
-    assert.deepEqual([...retro.querySelectorAll('#wr-roms [data-console]')].map((b) => b.dataset.console),
-      ['NES', 'SNES', 'N64', 'GB'], 'the ROMs tab is four console boxes, NES down to GB');
+    assert.equal(retro.querySelectorAll('[data-bundled]').length, 0,
+      'Web Retro must not list any preinstalled or bundled ROMs');
+    assert.equal(retro.querySelectorAll('[data-wr-tab="roms"]').length, 0,
+      'there must be no preinstalled ROMs tab');
+    assert.match(retro.querySelector('#wr-emu-home').textContent, /no preinstalled ROMs/i,
+      'the home view clearly states there are no preinstalled ROMs');
+    assert.ok(retro.querySelector('#wr-drop'), 'a drop zone accepts user ROM files');
+    assert.ok(retro.querySelector('#wr-quick-device'), 'quick-load offers This computer');
+    assert.ok(retro.querySelector('#wr-quick-vfs'), 'quick-load offers proton Files');
     const wrStyle = retro.querySelector('style').textContent;
     assert.match(wrStyle, /\.wr-consoles\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)[^}]*width:100%/,
       'the four console boxes should split the entire top width evenly');
     assert.match(wrStyle, /\.wr-topbar \.wr-back\{[^}]*font-size:28px[^}]*min-width:56px[^}]*min-height:48px/,
-      'the Emulator screen back arrow should be large');
-    const gridCount = () => retro.querySelectorAll('#wr-grid [data-bundled]').length;
-    assert.equal(gridCount(), 9, 'the NES box starts picked, with its games in the grid');
-    const firstArt = retro.querySelector('#wr-grid [data-bundled] img');
-    assert.ok(firstArt && /^data\/icons\/.+\.jpeg$/.test(firstArt.getAttribute('src')),
-      'bundled games show their poster art');
-    retro.querySelector('[data-console="GB"]').click();
-    assert.equal(gridCount(), 12, 'the GB box shows the GB/GBC/GBA games');
-    retro.querySelector('[data-console="SNES"]').click();
-    assert.equal(gridCount(), 5, 'the SNES box shows the SNES games');
-    retro.querySelector('[data-console="NES"]').click();
-    assert.equal(gridCount(), 9, 'picking NES again refills the grid');
-    retro.querySelector('[data-wr-tab="emulators"]').click();
-    assert.equal(retro.querySelector('#wr-roms').hidden, true, 'the Emulators tab hides the ROMs tab');
-    assert.equal(retro.querySelector('#wr-emulators').hidden, false, 'the Emulators tab shows its console boxes');
-    assert.deepEqual([...retro.querySelectorAll('#wr-emulators [data-core]')].map((b) => b.dataset.core),
+      'the system source screen back arrow should be large');
+    assert.deepEqual([...retro.querySelectorAll('#wr-emu-home [data-core]')].map((b) => b.dataset.core),
       ['nestopia', 'snes9x', 'mupen64plus_next', 'mgba']);
-    assert.equal(retro.querySelector('#wr-upload').hidden, true, 'no source screen before an emulator is picked');
+    assert.equal(retro.querySelector('#wr-upload').hidden, true, 'no source screen before picking a system or Files browser');
     retro.querySelector('[data-core="snes9x"]').click();
     assert.equal(retro.querySelector('#wr-upload').hidden, false);
-    assert.equal(retro.querySelector('#wr-corename').textContent, 'SNES');
+    assert.match(retro.querySelector('#wr-corename').textContent, /^SNES/);
     assert.ok(retro.querySelector('#wr-back'), 'the source screen has a back arrow');
     retro.querySelector('#wr-back').click();
-    assert.equal(retro.querySelector('#wr-upload').hidden, true, 'the back arrow returns to the emulator boxes');
-    assert.equal(retro.querySelector('#wr-emu-home').hidden, false, 'the back arrow shows the emulator boxes again');
-    retro.querySelector('[data-core="snes9x"]').click();
+    assert.equal(retro.querySelector('#wr-upload').hidden, true, 'the back arrow returns to the home chooser');
+    assert.equal(retro.querySelector('#wr-emu-home').hidden, false, 'the back arrow shows the console boxes again');
+    retro.querySelector('[data-core="nestopia"]').click();
     assert.equal(retro.querySelector('#wr-upload').hidden, false);
-    assert.ok(retro.querySelector('[data-src="device"]'), 'no "this computer" ROM source');
-    assert.ok(retro.querySelector('[data-src="vfs"]'), 'no "proton Files" ROM source');
+    assert.ok(retro.querySelector('[data-src="device"]'), 'offers "This computer" ROM source');
+    assert.ok(retro.querySelector('[data-src="vfs"]'), 'offers "proton Files" ROM source');
     assert.equal(retro.querySelector('#wr-play'), null,
       'there is no start button — picking a ROM launches it at once');
-    // A ROM imported into the proton file system is listed, then handed to the
-    // emulator over the BroadcastChannel like a device file.
+    // A user ROM imported into the proton file system is listed, then handed
+    // to the emulator over the BroadcastChannel like a device file.
     const home = w.eval('FS.home()');
     await w.eval(`FS.writeBlob(${JSON.stringify(home + '/Downloads/nes-rom.nes')}, new Blob([new Uint8Array([0x4e, 0x45, 0x53, 0x1a])]))`);
+    await w.eval(`FS.write(${JSON.stringify(home + '/Downloads/not-a-rom.txt')}, 'hello')`);
     retro.querySelector('[data-src="vfs"]').click();
     const dl = [...retro.querySelectorAll('[data-dir]')].find((b) => b.dataset.dir.endsWith('/Downloads'));
     assert.ok(dl, 'proton Files should show the Downloads folder');
     dl.click();
+    const badRow = [...retro.querySelectorAll('[data-file]')].find((b) => b.dataset.file.endsWith('not-a-rom.txt'));
+    assert.ok(badRow, 'proton Files lists directory contents');
+    badRow.click();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.ok(!retro.querySelector('#wr-frame'), 'non-ROM files must not boot the emulator');
+    assert.match(w.document.querySelector('#toasts').textContent, /Unsupported file/i);
     const row = [...retro.querySelectorAll('[data-file]')].find((b) => b.dataset.file.endsWith('nes-rom.nes'));
     assert.ok(row, 'proton Files should list the imported ROM');
     const chSent = [];
@@ -1083,27 +1077,27 @@ test('the desktop boots, lists and opens all catalogued apps', async () => {
     const frame = retro.querySelector('#wr-frame');
     assert.ok(frame, 'picking the ROM should frame the emulator at once');
     assert.match(frame.src, /rom=channel/);
+    assert.match(frame.src, /core=nestopia/);
+    assert.match(frame.src, /name=nes-rom\.nes/);
+    assert.equal(retro.querySelector('#wr-ext').hidden, false, 'Open in new tab shows while playing');
     w.__wrCh.onmessage({ data: { status: 'ready' } });
     assert.equal(chSent.length, 1, 'the launch page should get the ROM over the channel');
     assert.equal(chSent[0].rom.name, 'nes-rom.nes');
     // The emulator's own back arrow posts webretro-back from inside the
     // frame (the page it linked to upstream is not shipped and 404'd):
-    // the launcher answers by showing the ROMs tab again.
+    // the launcher answers by showing the ROM chooser again.
     const backEvent = new w.MessageEvent('message', { data: { type: 'webretro-back' } });
     Object.defineProperty(backEvent, 'source', { value: frame.contentWindow });
     w.dispatchEvent(backEvent);
     assert.ok(!retro.querySelector('#wr-frame'), 'the emulator back arrow should unframe the emulator');
-    assert.equal(retro.querySelector('#wr-roms').hidden, false, 'the emulator back arrow should show the ROMs tab');
-    assert.ok(retro.querySelector('[data-wr-tab="roms"]').classList.contains('primary'),
-      'the emulator back arrow returns to the ROMs tab');
-    assert.equal(retro.querySelector('#wr-again').hidden, true, 'Change game hides again in the chooser');
-    // Play the same ROM once more, then Change game in the app bar
-    // lands in the same ROMs tab.
-    retro.querySelector('[data-wr-tab="emulators"]').click();
-    retro.querySelector('[data-core="nestopia"]').click();
-    retro.querySelector('[data-src="vfs"]').click();
-    // the proton Files browser is still in Downloads from the first run;
-    // from the home folder it is one click further away
+    assert.equal(retro.querySelector('#wr-emu-home').hidden, false, 'the emulator back arrow returns to the ROM loader home');
+    assert.equal(retro.querySelector('#wr-again').hidden, true, 'Change ROM hides again in the chooser');
+    assert.equal(retro.querySelector('#wr-ext').hidden, true, 'Open in new tab hides again in the chooser');
+    // Quick-browse from proton Files auto-detects a user ROM and Change ROM
+    // returns to the same loader home.
+    retro.querySelector('#wr-quick-vfs').click();
+    assert.equal(retro.querySelector('#wr-upload').hidden, false);
+    assert.equal(retro.querySelector('#wr-vfs-wrap').hidden, false, 'Browse proton Files opens the VFS list immediately');
     let rowAgain = [...retro.querySelectorAll('[data-file]')].find((b) => b.dataset.file.endsWith('nes-rom.nes'));
     if (!rowAgain) {
       const dlAgain = [...retro.querySelectorAll('[data-dir]')].find((b) => b.dataset.dir.endsWith('/Downloads'));
@@ -1115,10 +1109,18 @@ test('the desktop boots, lists and opens all catalogued apps', async () => {
     rowAgain.click();
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.ok(retro.querySelector('#wr-frame'), 'picking the ROM should frame the emulator again');
-    assert.equal(retro.querySelector('#wr-again').hidden, false, 'Change game shows while a game runs');
+    assert.equal(retro.querySelector('#wr-again').hidden, false, 'Change ROM shows while a game runs');
     retro.querySelector('#wr-again').click();
-    assert.ok(!retro.querySelector('#wr-frame'), 'Change game should unframe the emulator');
-    assert.equal(retro.querySelector('#wr-roms').hidden, false, 'Change game should show the ROMs tab');
+    assert.ok(!retro.querySelector('#wr-frame'), 'Change ROM should unframe the emulator');
+    assert.equal(retro.querySelector('#wr-emu-home').hidden, false, 'Change ROM returns to the ROM loader home');
+    // Double-clicking a user ROM in proton Files opens it directly inside Web Retro.
+    await w.eval(`FS.writeBlob(${JSON.stringify(home + '/Downloads/homebrew.sfc')}, new Blob([new Uint8Array(32)]))`);
+    w.eval(`openFSItem(${JSON.stringify(home + '/Downloads/homebrew.sfc')})`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const sfcFrame = retro.querySelector('#wr-frame');
+    assert.ok(sfcFrame, 'opening a .sfc ROM from Files boots it in Web Retro');
+    assert.match(sfcFrame.src, /core=snes9x/, 'FS open auto-selects SNES core for .sfc ROMs');
+    assert.match(sfcFrame.src, /name=homebrew\.sfc/);
     w.closeWin('web-retro', true);
 
     // Every open/save asks which file system to use: "your Files" (this
@@ -1475,49 +1477,27 @@ test('the idiot app breeds real windows and only Make it stop ends it', async ()
   } finally { close(); }
 });
 
-/* Web Retro's bundled library is the maintainer's own ROM files: every
- * game listed in the launcher really is on disk (its extracted ROM in
- * webretro/roms/ and its box art in data/icons/), so a clicked card
- * always plays. */
-test('the Web Retro bundled ROM library is on disk', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'apps/tools/web-retro/app.html'), 'utf8');
-  const bundled = src.match(/const BUNDLED = \[([\s\S]*?)\n\s*\];/);
-  assert.ok(bundled, 'the launcher defines its bundled game list');
-  const entries = [...bundled[1].matchAll(/\['((?:[^'\\]|\\.)*)', '(\w+)',/g)]
-    .map((m) => [m[1].replace(/\\(.)/g, '$1'), m[2]]);
-  assert.ok(entries.length >= 20, `the bundled library lists ${entries.length} games`);
-  const extFor = { mupen64plus_next: ['.z64', '.n64', '.v64'], nestopia: ['.nes'], mgba: ['.gb', '.gbc', '.gba'], snes9x: ['.smc', '.sfc'] };
-  for (const [rom, core] of entries) {
-    assert.ok(fs.existsSync(path.join(ROOT, 'apps/tools/web-retro/webretro/roms', rom)), `bundled ROM missing: webretro/roms/${rom}`);
-    assert.ok(extFor[core] && extFor[core].some((ext) => rom.toLowerCase().endsWith(ext)), `${rom} is not a ROM the ${core} core plays`);
+/* Web Retro includes no preinstalled ROMs: only the four emulator cores
+ * live on disk, and the launcher + launch.html accept user-provided ROMs
+ * exclusively via file picker, drag-and-drop, or proton Files over a
+ * BroadcastChannel. */
+test('Web Retro includes no preinstalled ROMs and only loads user ROMs', () => {
+  const appSrc = fs.readFileSync(path.join(ROOT, 'apps/tools/web-retro/app.html'), 'utf8');
+  const launchSrc = fs.readFileSync(path.join(ROOT, 'apps/tools/web-retro/webretro/launch.html'), 'utf8');
+  assert.ok(!/const BUNDLED\s*=/.test(appSrc), 'the launcher must not define a BUNDLED ROM list');
+  assert.ok(!appSrc.includes('webretro/roms/'), 'the launcher must not fetch from webretro/roms/');
+  assert.ok(!appSrc.includes('data-wr-tab="roms"'), 'there must be no preinstalled ROMs tab');
+  assert.ok(!launchSrc.includes('addScript("roms/"'), 'launch.html must not fetch preinstalled ROM scripts from roms/');
+  assert.ok(!fs.existsSync(path.join(ROOT, 'apps/tools/web-retro/webretro/roms')),
+    'webretro/roms/ must not ship preinstalled ROMs');
+  for (const core of ['nestopia', 'snes9x', 'mupen64plus_next', 'mgba']) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'apps/tools/web-retro/webretro/cores', `${core}_libretro.js.js`)),
+      `emulator core JS missing: ${core}`);
+    assert.ok(fs.existsSync(path.join(ROOT, 'apps/tools/web-retro/webretro/cores', `${core}_libretro.wasm.js`)),
+      `emulator core WASM missing: ${core}`);
   }
-  for (const m of bundled[1].matchAll(/, '([a-z0-9-]+)'\]/g)) {
-    assert.ok(fs.existsSync(path.join(ROOT, 'data/icons', `${m[1]}.jpeg`)), `box art missing: data/icons/${m[1]}.jpeg`);
-  }
-  /* Each cover file must hold ITS game's art: the box-art upload was
-   * shuffled when it was copied into data/icons under proper names,
-   * and every file's contents were identified from a labelled contact
-   * sheet of the original upload before being pinned here by hash. */
-  const COVER_HASHES = {
-    'Castlevania': '63d7a8390bea', 'Contra': 'cd1dd7132512', 'banjo-kazooie': 'a1413cfb8acc',
-    'chrono-trigger': '285e9db261a4', 'donkey-kong-country': 'd78689ad5937', 'doom-64': '2cd1418649e4',
-    'doom-gba': '54a4371d227f', 'excitebike': 'd1d66dcee713', 'grand-theft-auto-2': 'b2d44125f07c',
-    'grand-theft-auto-advance': '778b0b4601ec', 'grand-theft-auto': '8fa1ee942bdb', 'lego-star-wars-the-video-game': 'ffef75a31404',
-    'mario-kart-64': '56a0a47c72b9', 'mario-party': '1614b990be2b', 'mega-man-2': '79ea0cbccd38',
-    'metroid': 'bf1bfb031205', 'paper-mario': '3016e9b6846d', 'pokemon-crystal': '3bc1f697ee02',
-    'pokemon-emerald': 'e36d289a2b1a', 'pokemon-red': '60129b90c936', 'pokemon-yellow': 'c287d537c1b8',
-    'space-invaders': 'f3f0c6513229', 'super-mario-64': '4e60a921ad5a', 'super-mario-advance': 'f2e913549cf3',
-    'super-mario-bros-2': '98fe15acfcd0', 'super-mario-bros-3': 'b1b5e238568d', 'super-mario-bros-deluxe': '43a08fbd8eb5',
-    'super-mario-bros-duck-hunt': 'e09e97027293', 'super-mario-world': '039bc3dd95ab', 'super-metroid': 'ddbb268835e7',
-    'super-smash-bros': '10d355992d29', 'tetris-nes': 'ca58cd9b87bd', 'the-legend-of-zelda-a-link-to-the-past': '980216a2f6dc',
-    'yoshis-story': 'e7d9405b544a',
-  };
-  const crypto = require('node:crypto');
-  for (const m of bundled[1].matchAll(/, '([a-z0-9-]+)'\]/g)) {
-    const hash = crypto.createHash('sha256')
-      .update(fs.readFileSync(path.join(ROOT, 'data/icons', `${m[1]}.jpeg`))).digest('hex').slice(0, 12);
-    assert.equal(hash, COVER_HASHES[m[1]], `data/icons/${m[1]}.jpeg does not hold ${m[1]}'s cover art`);
-  }
+  assert.ok(appSrc.includes('BroadcastChannel'), 'user ROMs are handed over BroadcastChannel');
+  assert.ok(appSrc.includes('readZipEntryNames'), 'launcher supports inspecting user .zip ROM archives');
 });
 
 /* Control bindings have to survive closing a game. RetroArch writes
@@ -1583,6 +1563,82 @@ test('Web Retro back arrow returns to the chooser instead of a 404', () => {
     'the emulator menu-bar back arrow should be large');
   assert.match(baseCss, /\.menuback \{[^}]*width: calc\(var\(--menubuttonbordery\) \+ 16px\) !important;/,
     'the emulator menu-bar back arrow should have a wider click target');
+});
+
+test('Web Retro auto-detects .zip user ROMs, prompts for ambiguous archives, and serves Open in new tab', async () => {
+  const { w, wins, close } = await bootDesktop();
+  try {
+    const channels = new Map();
+    w.BroadcastChannel = class {
+      constructor(name) { this.name = name; this.sent = []; channels.set(name, this); }
+      postMessage(m) { this.sent.push(m); }
+      close() {}
+    };
+
+    const makeZip = (entryName) => {
+      const nameBytes = Buffer.from(entryName, 'utf8');
+      const lfh = Buffer.alloc(30 + nameBytes.length);
+      lfh.writeUInt32LE(0x04034b50, 0);
+      lfh.writeUInt16LE(20, 4);
+      lfh.writeUInt16LE(nameBytes.length, 26);
+      nameBytes.copy(lfh, 30);
+      const cd = Buffer.alloc(46 + nameBytes.length);
+      cd.writeUInt32LE(0x02014b50, 0);
+      cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6);
+      cd.writeUInt16LE(nameBytes.length, 28);
+      nameBytes.copy(cd, 46);
+      const eocd = Buffer.alloc(22);
+      eocd.writeUInt32LE(0x06054b50, 0);
+      eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10);
+      eocd.writeUInt32LE(cd.length, 12);
+      eocd.writeUInt32LE(lfh.length, 16);
+      return new Uint8Array(Buffer.concat([lfh, cd, eocd]));
+    };
+
+    w.openApp('web-retro');
+    const retro = wins.get('web-retro').body;
+    const chooser = retro.querySelector('#wr-chooser');
+
+    // 1. Dropping a .zip containing a .gba entry auto-selects mgba and preserves .zip in name=
+    const gbaZip = new w.File([makeZip('homebrew/pocket.gba')], 'pocket-archive.zip', { type: 'application/zip' });
+    const dropEv = new w.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEv, 'dataTransfer', { value: { files: [gbaZip] } });
+    chooser.dispatchEvent(dropEv);
+    await new Promise((r) => setTimeout(r, 25));
+    const frame1 = retro.querySelector('#wr-frame');
+    assert.ok(frame1, 'dropping a .zip ROM boots Web Retro');
+    assert.match(frame1.src, /core=mgba/);
+    assert.match(frame1.src, /name=pocket-archive\.zip/, 'preserves .zip extension for webretro unzipper');
+
+    // Open in new tab holds its own active channel ready to deliver the same ROM
+    const extHref = retro.querySelector('#wr-ext').getAttribute('href');
+    const extChName = new URLSearchParams(extHref.split('?')[1]).get('channel');
+    assert.ok(extChName && channels.has(extChName), 'Open in new tab creates a live BroadcastChannel');
+    channels.get(extChName).onmessage({ data: { status: 'ready' } });
+    assert.equal(channels.get(extChName).sent[0].rom.name, 'pocket-archive.zip');
+
+    // 2. Dropping an ambiguous .zip prompts the user to pick a console manually
+    retro.querySelector('#wr-again').click();
+    const ambZip = new w.File([makeZip('readme.txt')], 'mystery.zip', { type: 'application/zip' });
+    const dropAmb = new w.Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropAmb, 'dataTransfer', { value: { files: [ambZip] } });
+    chooser.dispatchEvent(dropAmb);
+    await new Promise((r) => setTimeout(r, 25));
+    assert.ok(!retro.querySelector('#wr-frame'), 'ambiguous .zip waits for user system selection');
+    assert.match(retro.querySelector('#wr-sys-prompt').textContent, /mystery\.zip/);
+    retro.querySelector('[data-core="nestopia"]').click();
+    await new Promise((r) => setTimeout(r, 25));
+    const frame2 = retro.querySelector('#wr-frame');
+    assert.ok(frame2, 'clicking NES launches the ambiguous .zip with nestopia');
+    assert.match(frame2.src, /core=nestopia/);
+    assert.match(frame2.src, /name=mystery\.zip/);
+
+    // 3. Standalone launch.html without channel params reports no preinstalled ROMs instead of crashing
+    const launchHtml = fs.readFileSync(path.join(ROOT, 'apps/tools/web-retro/webretro/launch.html'), 'utf8');
+    const launchDom = new JSDOM(launchHtml, { url: 'http://localhost/apps/tools/web-retro/webretro/launch.html', runScripts: 'dangerously' });
+    assert.match(launchDom.window.document.getElementById('ffdcontent').textContent, /no preinstalled ROMs/i);
+    launchDom.window.close();
+  } finally { close(); }
 });
 
 /* proton's own UI draws artwork with its SVG icon set and raster images,
@@ -2144,11 +2200,13 @@ test('every kind of file has an app that opens it', async () => {
      * file system is unopenable — and the ids match the catalog exactly. */
     const cases = [['page.html', 'browser'], ['paper.pdf', 'pdf'], ['photo.png', 'image-viewer'],
       ['drawing.svg', 'image-viewer'], ['song.mp3', 'media'], ['clip.mp4', 'media'], ['movie.mkv', 'media'],
+      ['game.nes', 'web-retro'], ['game.sfc', 'web-retro'], ['game.gba', 'web-retro'], ['game.z64', 'web-retro'],
       ['notes.txt', 'text-editor'], ['data.json', 'text-editor'], ['module.js', 'text-editor']];
     for (const [name, id] of cases) {
       assert.equal(w.eval(`FS.appFor('/home/ada/${name}')`), id, `${name} should open in ${id}`);
       assert.ok(APPS[id], `${id} is named by FS.appFor() but is not installed`);
     }
+    assert.equal(w.eval(`FS.isBinary('/home/ada/game.nes')`), true, 'ROM bytes must never be decoded as text');
     assert.equal(w.eval(`FS.mediaKind('/home/ada/movie.mkv')`), 'video', 'an MKV file should count as video');
     assert.equal(w.eval(`FS.mime('/home/ada/movie.mkv')`), 'video/x-matroska', 'an MKV file gets the Matroska MIME type');
     assert.equal(w.eval(`FS.isBinary('/home/ada/movie.mkv')`), true, 'MKV bytes must never be decoded as text');

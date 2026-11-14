@@ -43,6 +43,9 @@ const FS = {
     'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'pdf',
     'ttf', 'otf', 'woff', 'woff2', 'zip', 'gz', 'wasm', 'exe', 'dll', 'so',
     'apk', 'jar', 'iso', 'bin', 'dat',
+    /* ROM extensions for Web Retro (never decoded as text) */
+    'nes', 'fds', 'unf', 'unif', 'smc', 'sfc', 'swc', 'fig', 'bs',
+    'z64', 'n64', 'v64', 'u1', 'ndd', 'gb', 'gbc', 'gba',
     /* every audio and video extension VLC's own picker accepts — see
      * MEDIA_AUDIO/MEDIA_VIDEO below; anything here is bytes, never text */
     'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'oga', 'opus', 'weba', 'wma',
@@ -143,6 +146,12 @@ const FS = {
     'mp4', 'm4v', 'mov', 'webm', 'avi', 'ogv', 'mkv', 'wmv', 'mpg', 'mpeg', '3gp',
     'flv', 'rm', 'rmvb', 'asf', 'vob', 'ts', 'm2ts', 'mts', 'divx',
   ]),
+  ROM_EXT: new Set([
+    'nes', 'fds', 'unf', 'unif',
+    'smc', 'sfc', 'swc', 'fig', 'bs',
+    'z64', 'n64', 'v64', 'u1', 'ndd',
+    'gb', 'gbc', 'gba',
+  ]),
   mediaKind(path) {
     const ext = this.extname(path);
     if (this.MEDIA_AUDIO.has(ext)) return 'audio';
@@ -158,6 +167,7 @@ const FS = {
     if (ext === 'pdf') return 'pdf';
     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'svg'].includes(ext)) return 'image-viewer';
     if (this.mediaKind(path)) return 'media';
+    if (this.ROM_EXT.has(ext)) return 'web-retro';
     return this.isBinary(path) ? null : 'text-editor';
   },
 

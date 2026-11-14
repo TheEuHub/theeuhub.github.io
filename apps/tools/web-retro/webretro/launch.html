@@ -15,7 +15,7 @@
 				<input type="checkbox" id="menuhider">
 				<label for="menuhider" class="menuhiderlabel"></label>
 				<ul id="menu">
-					<li class="menuback"><a href="#" title="Back to games" onclick='window.parent.postMessage({type: "webretro-back"}, "*");return false;'></a></li>
+					<li class="menuback"><a href="#" title="Back to ROM loader" onclick='window.parent.postMessage({type: "webretro-back"}, "*");return false;'></a></li>
 					<li>Controls
 						<ul>
 							<li><a id="keybindsbutton" href="">Keybinds</a></li>
@@ -268,17 +268,11 @@
         <script>
 var queries = Object.fromEntries(window.location.search.substring(1).split("&").map(i => i.split("=")).map(i => i.map(i => i && decodeURIComponent(i))));
 
-//?core=snes9x&rom=smrpg.smc&name=Super%20Mario%20RPG
-
 window.launchROMSettings = {
  core: queries.core,
  rom: queries.rom,
  name: queries.name || "GAME",
 };
-
-if (!queries.core || !queries.rom) {
- alert("Please make sure to have a core and a rom");
-}
 
 window.addScript = function(url, callback, err, text) {
  var script = document.createElement("script");
@@ -299,18 +293,6 @@ window.addScript = function(url, callback, err, text) {
  document.body.appendChild(script);
 }
 
-addScript("main.js", function() {
- setStatus("Getting core");
- var core = window.launchROMSettings.core + "_libretro.js";
- addScript("cores/" + core + ".js", function() {
-  fetch(window[core]).then(function(resp) {
-   resp.text().then(function(text) {
-    editScriptContent(text);
-   })
-  });
- });
-});
-
 var getGameROM = new Promise(function(resolve) {
  function fetchBlob(url) {
   fetch(url).then(function(resp) {
@@ -319,23 +301,39 @@ var getGameROM = new Promise(function(resolve) {
    });
   });
  }
- 
- if (launchROMSettings.rom == "channel") {
+
+ if (launchROMSettings.rom === "channel" && queries.channel) {
   var channel = queries.channel;
   const bc = new BroadcastChannel(channel);
   bc.onmessage = function(event) {
-   var romURL = URL.createObjectURL(event.data.rom);
-   fetchBlob(romURL);
+   if (event.data && event.data.rom) {
+    var romURL = URL.createObjectURL(event.data.rom);
+    fetchBlob(romURL);
+   }
   };
   bc.postMessage({status: "ready"});
-  return;
  }
- 
- addScript("roms/" + launchROMSettings.rom + ".js", function() {
-  var gameDataBlobURL = window[launchROMSettings.rom];
-  fetchBlob(gameDataBlobURL);
- });
 });
+
+if (!queries.core || queries.rom !== "channel" || !queries.channel) {
+ var ffdBox = document.getElementById("ffdcontent");
+ document.getElementById("ffd").style.display = "block";
+ if (ffdBox) {
+  ffdBox.innerHTML = "<p style='padding:24px;text-align:center;line-height:1.5'>Web Retro includes no preinstalled ROMs.<br>Open <b>Web Retro</b> from proton to load your own ROM file.</p>";
+ }
+} else {
+ addScript("main.js", function() {
+  setStatus("Getting core");
+  var core = window.launchROMSettings.core + "_libretro.js";
+  addScript("cores/" + core + ".js", function() {
+   fetch(window[core]).then(function(resp) {
+    resp.text().then(function(text) {
+     editScriptContent(text);
+    })
+   });
+  });
+ });
+}
 
 function editScriptContent(text) {
  var regexp = /var\swasmBinaryFile="(\w+\.wasm)";/;
@@ -351,7 +349,6 @@ function editScriptContent(text) {
   document.title = launchROMSettings.name;
   setStatus("Waiting for game");
   getGameROM.then(function(data) {
-   console.log([{path: launchROMSettings.name, data: data}]);
    initFromFile([{path: launchROMSettings.name, data: data}]);
    document.getElementById("menubar").style.display = "block";
   });

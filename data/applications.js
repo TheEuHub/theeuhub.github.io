@@ -290,7 +290,7 @@ icon=data/icons/webretro.png
 svg-icon=false
 cat=Tools
 preinstalled=true
-desc=Play retro classics or your own ROMs - N64, SNES, NES, Game Boy
+desc=Load and play your own ROMs - N64, SNES, NES, Game Boy
 w=980
 h=640
 

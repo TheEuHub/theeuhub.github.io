@@ -438,41 +438,17 @@ RetroArch compiled for the web by
   which proton does not ship, so the link 404'd). The core/wasm
   wrappers are Gams' `file://`-friendly packaging of those files.
 - `apps/tools/web-retro/app.html` is proton's launcher, adapted from Gams'
-  `g/webretro.html`: the same core list and BroadcastChannel ROM hand-off to
-  `webretro/launch.html?rom=channel`, with the UI rebuilt on proton's widgets
-  and the ROM name URL-encoded. The ROM can come from either file system —
-  the device's own file picker, or the proton virtual file system (proton
-  Files, read with `FS.readBlob`) — or from the bundled library, which is
-  fetched from `roms/` and handed over the same channel.
+  `g/webretro.html`: the four installed Libretro cores (`nestopia`,
+  `snes9x`, `mupen64plus_next`, `mgba`) and BroadcastChannel ROM hand-off to
+  `webretro/launch.html?rom=channel`, rebuilt on proton's widgets.
+  Web Retro includes no preinstalled ROMs; users only load their own game
+  or ROM files (`.nes`, `.fds`, `.smc`, `.sfc`, `.z64`, `.n64`, `.v64`,
+  `.gb`, `.gbc`, `.gba`, or `.zip`) from their computer, drag-and-drop, or
+  proton Files (read with `FS.readBlob`), and those bytes never leave the
+  browser.
 - The app icon is Gams' `img/webretro.png`, saved as
   `data/icons/webretro.png` and set as the catalog default
   (`icon=data/icons/webretro.png`, `svg-icon=false`).
-
-**The bundled ROMs are the maintainer's own files.** At the maintainer's
-request, `apps/tools/web-retro/webretro/roms/` carries their own ROM
-library — supplied as `.zip` files, stored here extracted (the archives
-were dropped once the ROMs were unzipped): Mario Kart 64, Mario Party, Paper
-Mario, Doom 64, Yoshi's Story, Super Mario 64, Banjo-Kazooie and
-Super Smash Bros. (N64); Excitebike, Super Mario Bros. + Duck Hunt,
-Super Mario Bros. 2, Super Mario Bros. 3, Tetris, Castlevania, Contra,
-Mega Man 2 and Metroid (NES); Super Mario World, The Legend of
-Zelda: A Link to the Past, Donkey Kong Country, Super Metroid and
-Chrono Trigger (SNES); Doom, Grand Theft Auto Advance, LEGO Star Wars:
-The Video Game, Pokémon Emerald and Super Mario Advance (GBA); Grand Theft
-Auto, Grand Theft Auto 2, Pokémon Red, Pokémon Yellow, Pokémon Crystal,
-Space Invaders and Super Mario Bros. Deluxe (Game Boy/Color). Their box
-art (also maintainer-supplied) lives in `data/icons/` and fronts them in
-the launcher. Those are commercial games © Nintendo, id Software,
-Rockstar Games, The Pokémon Company, Electronic Arts, Activision, LEGO
-and their respective rights holders: this repository grants no rights in
-them, and they are mirrored here as the maintainer's own library. Web
-Retro still runs any ROM file you choose — from your own device or from
-proton's virtual file system — handed to the emulator in-page over a
-BroadcastChannel; those never leave the browser. If you hold rights in a
-bundled ROM and want it removed, open an issue or pull request and it
-will be taken down. (An earlier bundled library copied from the Gams
-catalog, and the Super Mario RPG launcher game that used it, were
-removed in 2026-10 and are not part of this library.)
 
 The webretro files stay under their upstream licence (GPL-3.0, © the webretro
 and libretro authors) and are distributed here as a separate part of this
