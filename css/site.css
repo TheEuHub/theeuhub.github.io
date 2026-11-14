@@ -289,7 +289,7 @@ img{user-select:none}
 
 /* ─── source cards ─── */
 .source{border-top:1px solid var(--line);background:radial-gradient(1000px 540px at 8% -12%, rgba(125,227,129,.055), transparent 62%)}
-.source-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem}
+.source-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem}@media (max-width:1180px){.source-grid{grid-template-columns:repeat(2,1fr)}}
 .source-card{
   position:relative;display:flex;flex-direction:column;gap:.7rem;text-decoration:none;
   background:var(--card);border:1px solid var(--line);border-radius:var(--radius);

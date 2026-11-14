@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWTK — SwiftUI, Rendered by HTML · OldOS</title>
+<meta name="description" content="A fan-made SwiftUI→HTML engine: write real SwiftUI syntax, watch it render live in the browser. Recursive-descent transpiler plus a ~600-line hand-written runtime. CC BY 4.0.">
+<meta property="og:title" content="SWTK — SwiftUI, Rendered by HTML">
+<meta property="og:description" content="Write SwiftUI in a textarea. Press Run. It renders. A fan-made engine from The OldOS Project.">
+<link rel="icon" type="image/png" href="../assets/img/favicon.png">
+<link rel="stylesheet" href="engine.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="back" href="../index.html" aria-label="Back to OldOS">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    OldOS
+  </a>
+  <div class="brand"><b>SWTK</b><span>Swift → Web</span></div>
+  <span class="pill">CC&nbsp;BY&nbsp;4.0</span>
+</header>
+
+<section class="hero">
+  <span class="eyebrow"><i class="dot"></i>Now Compiling · SwiftUI → HTML</span>
+  <h1>SwiftUI, <em>rendered by HTML.</em></h1>
+  <p>Apple never shipped SwiftUI for the browser — so The OldOS Project grew its own. <strong>SWTK</strong> is a recursive-descent transpiler feeding a hand-written declarative runtime: <strong>real Swift syntax in, live HTML out</strong>. No build step. No WebAssembly. No framework — just a textarea and a Run button.</p>
+  <div class="hero-stats">
+    <div><b>~40 KB</b><span>transpiler, commented</span></div>
+    <div><b>436</b><span>lines of runtime</span></div>
+    <div><b>0</b><span>dependencies</span></div>
+    <div><b>100%</b><span>static, like everything else here</span></div>
+  </div>
+</section>
+
+<main class="workspace">
+  <!-- ─── editor ─── -->
+  <section class="panel" aria-label="SwiftUI source editor">
+    <div class="panel-head">
+      <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
+      <span class="file-name" id="fileName">CounterView.swift</span>
+      <div class="spacer"></div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="SwiftUI source"></textarea>
+    <div class="error-bar" id="errorBar" role="alert"></div>
+    <pre id="genOut" aria-label="Generated JavaScript"></pre>
+    <div class="panel-foot">
+      <button class="btn btn-run" id="runBtn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 1.5v9l8-4.5-8-4.5z" fill="currentColor"/></svg>
+        Run
+      </button>
+      <button class="btn btn-ghost" id="genBtn" aria-pressed="false">&lt;/&gt; Show generated JS</button>
+      <button class="btn btn-ghost" id="resetBtn">Reset sample</button>
+    </div>
+  </section>
+
+  <!-- ─── preview ─── -->
+  <aside class="preview-col">
+    <div class="stage-wrap">
+      <div class="stage-label">
+        <span>Preview · iOS light</span>
+        <span class="live-dot"><i></i>Live</span>
+      </div>
+      <div class="stage">
+        <div class="screen" id="preview" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="panel notes">
+      <h3>What this is</h3>
+      <ul>
+        <li><b>Real Swift, not a parody.</b> The compiler reads <code>@State</code>, <code>var body: some View</code>, <code>ForEach</code>, modifiers and interpolation — then emits plain JS.</li>
+        <li><b>State is real.</b> <code>count += 1</code> invalidates the view and re-renders, the SwiftUI way — only here it never leaves the page.</li>
+        <li><b>Honest scope.</b> It’s a subset: no <code>@ObservedObject</code>, no navigation stack, no animations yet. Unsupported syntax fails loudly with a line number, never silently.</li>
+      </ul>
+    </div>
+  </aside>
+</main>
+
+<section class="section">
+  <div class="how">
+    <div class="how-card">
+      <div class="how-num">01 — LEX</div>
+      <h4>Swift, tokenized</h4>
+      <p>A hand-written lexer splits your source — strings with <code>\(interpolation)</code>, nested comments, operators like <code>...</code> and <code>..&lt;</code> — into a flat token stream with line numbers.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-num">02 — PARSE</div>
+      <h4>Recursive descent</h4>
+      <p>A small parser builds the view tree: <code>VStack</code>s, modifiers, <code>if / else</code> inside builders, <code>ForEach</code> with ranges or collections, ternaries, statements and all.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-num">03 — RENDER</div>
+      <h4>Descriptors → HTML</h4>
+      <p>Modifiers become an immutable descriptor tree. The 600-line runtime diffs nothing — it rebuilds and re-mounts, restoring field focus and caret so it feels native.</p>
+    </div>
+  </div>
+
+  <div class="surface">
+    <div class="surface-card">
+      <h4>Supported surface</h4>
+      <div class="chip-grid" id="chipYes"></div>
+    </div>
+    <div class="surface-card">
+      <h4>Not (yet) supported</h4>
+      <div class="chip-grid" id="chipNo"></div>
+    </div>
+  </div>
+</section>
+
+<footer class="page-footer">
+  <p>SWTK is a fan-made engine from <a href="../index.html">OldOS · Web Edition</a>, recreating <a href="https://github.com/zzanehip/The-OldOS-Project" rel="noopener">zzanehip’s The OldOS Project</a> — used under <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC&nbsp;BY&nbsp;4.0</a>. Apple, iPhone, iOS, Swift and SwiftUI are trademarks of Apple Inc., who have nothing to do with this and would probably rather write <code>UIKit</code> in peace. SWTK is not a Swift compiler — it’s a respectful homage that happens to ship with one.</p>
+  <a class="back" href="../index.html">← Back to OldOS</a>
+</footer>
+
+<script src="swtk.js"></script>
+<script src="swiftc.js"></script>
+<script src="samples.js"></script>
+<script>
+(function () {
+  'use strict';
+  var src = document.getElementById('src');
+  var fileName = document.getElementById('fileName');
+  var errorBar = document.getElementById('errorBar');
+  var genOut = document.getElementById('genOut');
+  var preview = document.getElementById('preview');
+  var runBtn = document.getElementById('runBtn');
+  var genBtn = document.getElementById('genBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var presets = document.getElementById('presets');
+
+  var SUPPORTED = [
+    'struct Name: View', '@State', 'var body: some View', 'let constants',
+    'VStack · HStack · ZStack · Group', 'ScrollView · List', 'Text + interpolation',
+    'Button { }', 'TextField · Toggle · Slider', 'Image(systemName:)',
+    'Spacer · Rectangle · Circle', 'ForEach(range) / ForEach(collection)',
+    'if / else in builders', 'let in builders', '.padding · .foregroundColor',
+    '.background · .fill · .font · .fontWeight', '.bold · .italic · .cornerRadius',
+    '.frame · .opacity · .shadow · .tint', '.tracking · .lineLimit', '.onTapGesture { }',
+    'Int() · Double() · String() · abs()', 'ternary · && || ! · arrays', 'x = e · x += e · flag.toggle()'
+  ];
+  var UNSUPPORTED = [
+    '@ObservedObject · @Binding · @Environment', 'NavigationStack / navigationTitle',
+    'Sheets · alerts · popovers', 'Animations & transitions', '.sheet · .alert · .onAppear',
+    'Custom member functions', 'Property observers', 'Protocols other than View', 'Subscript syntax arr[i]'
+  ];
+  document.getElementById('chipYes').innerHTML = SUPPORTED.map(function (s) { return '<span class="chip">' + s + '</span>'; }).join('');
+  document.getElementById('chipNo').innerHTML = UNSUPPORTED.map(function (s) { return '<span class="chip no">' + s + '</span>'; }).join('');
+
+  var current = null;
+  var currentView = null;
+
+  function renderPresets() {
+    presets.innerHTML = '';
+    SWTK_SAMPLES.forEach(function (s) {
+      var b = document.createElement('button');
+      b.className = 'preset' + (current && current.id === s.id ? ' active' : '');
+      b.textContent = s.name;
+      b.addEventListener('click', function () { loadSample(s, true); });
+      presets.appendChild(b);
+    });
+  }
+  function loadSample(s, force) {
+    if (force || !src.value) {
+      current = s;
+      src.value = s.code;
+      fileName.textContent = s.file;
+    }
+    renderPresets();
+    run();
+  }
+  function run() {
+    var code = src.value;
+    errorBar.classList.remove('show');
+    errorBar.textContent = '';
+    try {
+      var out = SWIFTC.compile(code);
+      genOut.textContent = out.js;
+      var cls = new Function('SWTK', out.js)(SWTK);
+      if (currentView) { currentView.__container = null; }
+      preview.innerHTML = '';
+      currentView = SWTK.mount(cls, preview);
+      livePulse();
+    } catch (e) {
+      errorBar.textContent = String(e && e.message ? e.message : e);
+      errorBar.classList.add('show');
+    }
+  }
+  var liveTimer = null;
+  function livePulse() {
+    var dot = document.querySelector('.live-dot');
+    if (!dot) return;
+    dot.style.color = '#7ecbff';
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(function () { dot.style.color = ''; }, 350);
+  }
+  runBtn.addEventListener('click', run);
+  genBtn.addEventListener('click', function () {
+    var open = genOut.classList.toggle('show');
+    genBtn.classList.toggle('on', open);
+    genBtn.setAttribute('aria-pressed', String(open));
+    genBtn.innerHTML = open ? '&lt;/&gt; Hide generated JS' : '&lt;/&gt; Show generated JS';
+  });
+  resetBtn.addEventListener('click', function () {
+    if (!current) return;
+    src.value = current.code;
+    run();
+  });
+  src.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+  });
+
+  var saved = null;
+  try { saved = localStorage.getItem('swtk-src'); } catch (e) {}
+  if (saved && saved.trim().length) {
+    src.value = saved;
+    current = SWTK_SAMPLES[0];
+    fileName.textContent = 'untitled.swift';
+    renderPresets();
+    run();
+  } else {
+    loadSample(SWTK_SAMPLES[0], true);
+  }
+  var saveTimer = null;
+  src.addEventListener('input', function () {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try { localStorage.setItem('swtk-src', src.value); } catch (e) {}
+    }, 300);
+  });
+})();
+</script>
+</body>
+</html>

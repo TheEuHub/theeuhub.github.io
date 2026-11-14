@@ -28,6 +28,18 @@ A full working simulator embedded in the landing page — not screenshots:
 
 Everything runs client-side. There is no server. There is only the 2010 dream.
 
+## Bonus: SWTK — SwiftUI, rendered by HTML
+
+Shipped alongside the OS: **`/swiftweb/`** ([live](https://theeuhub.github.io/swiftweb/)) is a fan-made SwiftUI→HTML engine.
+
+- Write **real SwiftUI syntax** in a textarea — `@State`, `var body: some View`, `ForEach`, modifiers, `$bindings`
+- A hand-written lexer + recursive-descent parser + emitter transpiles it to plain JS
+- A ~440-line declarative runtime renders it to HTML with SwiftUI-style invalidation (focus/caret restored)
+- Unsupported syntax fails with **line-numbered compiler errors**, never silently
+- Every sample view re-renders live in the page — tap the buttons, flip the toggles
+
+Why not SwiftWasm? GitHub Release assets are unreachable from the build environment, and a 1 GB toolchain is a poor trade for a static page. SWTK keeps the part that matters — Swift syntax as the authoring format — in ~1,400 dependency-free lines. See [`swiftweb/README.md`](swiftweb/README.md) for the supported surface and honest limitations.
+
 ## Run it
 
 ```bash
@@ -45,6 +57,7 @@ Or just visit **https://theeuhub.github.io/**
 - Web Audio API (ringtones, chimes, DTMF, chiptunes) · IndexedDB (memos) · localStorage (everything else)
 - Canvas 2D (clock faces, iPod artwork, stock charts, snake)
 - Geolocation + DeviceOrientation (Maps, Compass) · getUserMedia (Camera, Voice Memos)
+- SWTK: hand-written Swift lexer/parser/emitter + declarative runtime (see `swiftweb/`)
 - Assets: original OldOS artwork, transcoded from CgBI PNGs and upscaled JPEGs for the web
 
 ## Credits & License
