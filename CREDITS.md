@@ -1,0 +1,525 @@
+# Credits & provenance
+
+**proton** (this repository) is a static, browser-only clone and
+rebrand of **Mixt**, from:
+
+- Upstream: https://github.com/proton-arcade/mlp/tree/arena/170861f7-mlp
+- Commit cloned: `c37c6cae251cf482749b19280dbafc70ccd1a6e0` (“Remove email confirmation”)
+
+## Why it isn't a file-for-file copy
+
+The upstream is a ~1.2 GB full-stack project: a Node.js server (`node
+server.cjs`), SQLite, an HTTPS front on port 8835, a webpack-built GUI and
+the Mixt.js SDK. None of that can run on GitHub Pages, which only serves
+static files. So the desktop, window manager and apps were **rebuilt with
+vanilla HTML/CSS/JS and zero dependencies**, keeping the upstream behaviour
+and look wherever a browser-only equivalent exists:
+
+| Upstream (Mixt) | Here (proton) |
+| --- | --- |
+| Mint-Y theme `src/gui/src/css/mixt.css` (accent `#68b723`, light gradient title bars, dark bottom panel) | Panel layout/chrome reimplemented in `assets/styles.css`, with the palette changed to black-and-white for proton |
+| Server accounts, `admin` first sign-in, whitelist | Local profiles stored **only in this browser** (localStorage), a shared desktop password in `data/password.txt` asked on every refresh, lock screen |
+| IndexedDB app storage (`src/apps/shared/localdb.js`) | Per-account localStorage state, export/import backup in Settings |
+| `src/apps/notes`, `calendar`, `spreadsheet`, `whiteboard`, `presentation`, `terminal`, `pdf-editor`, `media`, `mail`, `contacts` | Were browser-only rewrites with the same core behaviour — **removed**; see below |
+| `src/apps/sudoku/logic.js`, `checkers`, `chess`, `klondike`, `backgammon` | Sudoku generator/checker was adapted from the original pure-logic file, the other games reimplemented to the same rules — **removed** |
+| `src/apps/team-chat`, `g-talk`, `meetings` | On-device channels/direct chat with a local helper bot; meeting planner — removed earlier (real calls need a server) |
+| `src/apps/admin-vault`, dashboard Admin tab | Vault app that re-checked your account password (removed earlier); account/device stats survive in **Settings** |
+| `src/app-center`, Files/dashboard | **App Center** (hide/restore built-ins; previously saved user apps and sites remain openable/removable per account, the add-from-URL flow is disabled). The virtual Files drive is back: **Files** browses and manages the same file system (`assets/fs.js`), and Text Editor / Image Viewer / Media / PDF Viewer open what it finds |
+| — (modular layer) | **Customize** app: every built-in module's name/icon/category/order is editable and resettable, custom themes & wallpapers can be added/edited/removed/applied, and desktop parts (clock, hint, tray buttons, menu search, panel labels) toggle live — all per-account state with migration |
+| `internet/*` sites | Built-in websites as separate modules loaded into the Browser's SITES registry — **removed** except Test Page, the one entry left in `data/websites.js` |
+| `internet/world-history`, `internet/mixt-guide` | Built-in Browser pages — **removed** with the other websites |
+| — (new in this rebrand) | Calculator (solver, graph plotter, formula cards) was new in this rebrand — **removed** |
+
+Things that fundamentally need a server were replaced with honest on-device
+equivalents and are labelled as such in-app: real e-mail/chat/video transport,
+multi-user whitelisting, cloud storage, and the Mixt.js SDK.
+
+## Licence
+
+proton, like Mixt and the Puter-derived code it is based on, is
+licensed under the **GNU Affero General Public License v3.0 only** — see
+`LICENSE.txt`. Mixt contains code derived from Puter, copyright Puter
+Technologies Inc., also AGPL-3.0. Original copyright notices in upstream
+source files remain theirs.
+
+Not affiliated with Linux Mint, Cinnamon, Puter Technologies, or the Mixt
+authors.
+
+## What this build ships
+
+  `assets/styles.css` carries the shell's chrome, the classes the shipped apps
+  use (including the file manager/viewer and browser/search blocks), and
+  `tests/` is a single suite for this build, including tests that drive the
+  Files suite end to end.
+- **92 game entries from the older build** — the 19 Proton Arcade titles,
+  68 Gams Offline titles and the five local games above (the local five were
+  not streamed), catalogued in `data/applications.js` before trimming.
+  Removed with them: `assets/game-host.js` (the shared
+  frame host), `assets/game-icons.js` (their hand-drawn monochrome SVG glyphs),
+  the `.arcade-*` styles, and the two Gams builds that had been copied into
+  this repository under `games/gams/g/g/` (*A Dance of Fire and Ice*,
+  *Grey Box Testing*) — none of those game builds or the old streamed catalog
+  are bundled here. The Celeste Classics files that *are* vendored here are
+  documented below.
+- **5 of the 6 built-in websites** — Guide, World History, Maths Resources,
+  proton Daily and the Digital Logic Sim web edition (an independent
+  re-implementation inspired by Sebastian Lague's MIT-licensed Digital Logic
+  Sim, which also carried upstream's JetBrains Mono NL fonts under SIL OFL
+  1.1). **Test Page** was kept and rewritten as this build's smoke test, so
+  `websites/` still exists with that one site (plus `_template/`) and
+  `data/websites.js` still holds one `[website]` block; the Browser also copes
+  with an empty catalog if it is removed.
+- **The styles, icons and tests that only those apps used** —
+  `assets/styles.css` carries the shell's chrome plus the classes used by the
+  thirteen shipped app wrappers, and `tests/` is a single suite for this trimmed build.
+
+Nothing in the desktop shell was removed: accounts, the window manager, the
+panel and start menu, per-account desktop shortcuts, the customisation layer,
+the virtual file system (`assets/fs.js`, `data/fs-manifest.js`,
+`assets/fs-archive.js`) and the Browser's ability to open an HTML page from it
+all still work — and the file system now has its apps back, so it is browsable,
+editable and exportable from the desktop itself. The account data model in
+`assets/store.js` still carries the removed apps' data (notes, events,
+contacts, sheets, slides, boards), so an older backup still imports and any of
+those apps can be added back with a folder under `apps/inbuilt/` and one
+catalog block.
+
+The search engine is new in this build rather than inherited, and it exists
+because a static page with no server still needs a way to find things: the only
+corpus it can honestly search is its own repository. `tools/gen-search-index.py`
+generates `data/search-index.js` from the prose of every deployed file,
+`assets/search.js` scores it, and the Browser (`apps/inbuilt/browser/`) grew the
+chrome around it — tabs, back/forward, bookmarks, history, suggestions and a
+reader. No search API is called and no query leaves the browser. It also refuses
+to bluff: a hit is either an **answer** (the repository is about that word here)
+or a **mention** (the word only turns up), the Browser lists answers as results
+and mentions beneath them, and when nothing answers it says so plainly rather
+than promoting an incidental match. proton has no dictionary, so it does not
+pretend to have one.
+
+The provenance table above and the sections that used to follow it (Digital
+Logic Sim, the streamed Proton Arcade and Gams Offline catalogs) are historical:
+those builds are no longer bundled here. Their upstream projects' licences and
+copyrights are unaffected, and this repository grants no rights in their game
+content.
+
+## Vendored cover video
+
+`assets/youare.mp4` is the looping *You Are An Idiot* video formerly used
+by the cover's removed bottom-button trap. The cover trap stays removed;
+the file is retained in this repository and is now played only inside
+the fake desktop by the not-preinstalled **You Are An Idiot** app
+(`apps/tools/you-are-an-idiot/`), which reproduces the old menace —
+real bouncing, breeding windows that no × can close, and the song on
+autoplay — entirely within proton; its Make it stop button is the only
+way out. It was copied directly into this repository
+from the `media/youare.mp4` file in the
+[Mist0090/youareanidiot.cc](https://github.com/Mist0090/youareanidiot.cc)
+mirror of [youareanidiot.cc](https://youareanidiot.cc/). All rights in the
+video and its audio remain with their original creators; this repository
+grants no rights in that content.
+
+## Vendored Celeste Classics
+
+The **Celeste Hub** app (`apps/games/celeste-hub/`) carries the **actual game
+files**, copied from
+[Math-halper/Celeste](https://github.com/Math-halper/Celeste) (that
+repository's `classic/`, `two/` and `speed/` folders). It is one app with an
+in-app chooser: pick which Celeste game to play, and **Change game** returns
+to the list. The eight choices are the pages that used to be eight separate
+proton apps (`celeste-classic`, `celeste-two`, `celeste-community`,
+`celeste-practice-mod`, `celeste-two-practice-mod-1-0`,
+`celeste-two-practice-mod-1-1`, `celeste-webek` and `celeste-downloads`,
+now combined):
+
+- `apps/games/celeste-classic/` — Celeste Classic (the PICO-8 export of *Celeste
+  Classic* by Maddy Thorson & Noel Berry), from `classic/`
+- `apps/games/celeste-two/` — *Celeste Classic 2: Lani's Trek* (community follow-up),
+  from `two/`
+- `apps/games/celeste-community/` — the Celeste Classic community hub, its practice
+  mods, downloads and WebEK tool, from `speed/`. The hub frames the community
+  hub page, both Classic 2 practice-mod pages, the Classic practice-mod page,
+  Webek and the downloads page directly, so every page in the folder is still
+  its own tested game inside the hub; the pages stay in this shared folder so
+  their relative paths keep working.
+
+The game folders keep the game's own pages; only the hub's `app.html` (in
+`celeste-hub/`) is proton's own code, plus its standalone chooser page
+(`celeste-hub/index.html`, which the "all games" picker links to). The only
+edits to the game files are link fixes in the community hub and practice
+pages: their site-absolute links (`/glossary/` and friends) now point at the
+Celeste Classic community site that hosts those pages, so they resolve
+instead of landing on this site's missing root paths. The pages' "all games"
+links go one level up (`href="../"`), as on the source site —
+`apps/games/index.html` is that picker: proton's own "all games" page listing
+every game in the folder (the source repository's root selector is not used).
+
+The Celeste Hub icon (`data/icons/celeste-classic.png`) is a shared pixel-art
+image uploaded by the repository maintainer. Nothing else was redrawn.
+
+All rights in the games, builds and assets remain with their authors (the
+Celeste Classic PICO-8 game is © Maddy Thorson, Noel Berry and the PICO-8
+community; the community follow-up, practice mods and tools are © their
+authors). This repository grants no rights in that content — it is here so
+the hub runs from the user's own repository files.
+
+## Vendored Mario games
+
+Two unofficial Mario fan games are vendored from
+[Math-halper/Mario](https://github.com/Math-halper/Mario) — **only the game
+builds**; that collection's landing page, READMEs and other files are not
+used. Each app folder is the game's own files plus proton's thin iframe
+wrapper (`app.html`); nothing in the game files was edited.
+
+- `apps/games/sm64/` — Super Mario 64: the three build files (`index.html`,
+  `sm64.us.f3dex2e.js`, `sm64.us.f3dex2e.wasm`) of a precompiled WebAssembly
+  port of the SM64 decompilation, byte-for-byte from that collection's `sm64/`
+  folder (itself identical to
+  [incrediblerevived11's build](https://github.com/incrediblerevived11/incrediblerevived11.github.io/tree/main/sm64)
+  @ `a08ec53`). Credit to that host and the original SM64
+  port/decompilation contributors; the build does not identify the full port
+  authorship. **No declared upstream license** — public availability does not
+  grant redistribution rights.
+- `apps/games/mari0/` — *Mari0 — Mario × Portal* by **Maurice Guégan /
+  Stabyourself** ([Stabyourself/mari0](https://github.com/Stabyourself/mari0),
+  v1.6 / LÖVE 11.4, stated **MIT** upstream), byte-for-byte from that
+  collection's `mari0/web/` build. The browser runtime is **love.js** by
+  **Davidobot** (continuing **Tanner Rogalsky's** Emscripten port of LÖVE,
+  both MIT); its license ships as `apps/games/mari0/LOVEJS-LICENSE.txt`, and
+  the build's own credits notice as `apps/games/mari0/CREDITS.txt`. The
+  browser edition's changes (offline stubs for LuaSocket, WebGL GLSL rules,
+  save-folder opening disabled, online/mappack/netplay paths off, a
+  per-source audio-stop workaround for love.js's OpenAL shim, rebuilt portal
+  input) were made upstream of this repository — see that collection's
+  credits.
+
+**These are unofficial fan projects and are not affiliated with Nintendo.**
+Mario, Portal and other third-party artwork, music and trademarks may carry
+separate rights; a code license is not blanket asset clearance. This
+repository grants no rights in Nintendo's game assets, and no permission to
+redistribute them is claimed or implied.
+
+The app icons for `mari0` and `sm64` are key-art images uploaded by the
+repository maintainer (512×512, under `data/icons/`). The same rights note
+applies to them.
+
+## Vendored Cookie Clicker
+
+`apps/games/cookie-clicker/` is Orteil's **Cookie Clicker** idle game,
+copied byte-for-byte from the offline mirror in
+[Gams-Offline/Gams](https://github.com/Gams-Offline/Gams) (`g/g/cookie/` —
+itself the [ozh/cookieclicker](https://github.com/ozh/cookieclicker) mirror;
+its README travels with the game). The one omission is `img/Thumbs.db`, a
+Windows Explorer thumbnail cache that is not part of the game. The only
+edits here are a page link fix (the "Try the beta!" link now gives the
+upstream beta address in full) and a tiny `showads.js` placeholder for the
+ad-detection script the mirror did not include; the game build is untouched.
+
+The game is self-contained — its own `img/`, `snd/`, `loc/` translations and
+minigames all ship in the folder — and saves to the browser's localStorage.
+Some of the original page chrome points at remote URLs (ads, cookie consent,
+Google Fonts, links to Orteil's other work) and fails quietly when offline.
+
+Cookie Clicker is © **Orteil (DashNet)**; the original lives at
+[orteil.dashnet.org/cookieclicker](https://orteil.dashnet.org/cookieclicker/).
+The mirror carries **no license granting redistribution** — the game is here
+as the offline copy the Gams link points at, and no further rights are
+claimed or implied. The app icon is the game's own cookie art from the
+mirror's `img/cookieclicker.png`, scaled into `data/icons/`.
+
+## Vendored Gams-Offline games (batch)
+
+Twenty-three more games ship under `apps/games/`, each copied from
+[Gams-Offline/Gams](https://github.com/Gams-Offline/Gams):
+
+- **Single-file HTML5 games** — Slope, Stickman Hook, Stack, 2048, Spacebar
+  Clicker and Offline Paradise (`g/<name>.html`, one self-contained file
+  each).
+- **Flash classics, played on Ruffle** — Pacman, Tetris, Bloxorz, The
+  Impossible Quiz, Bloons Tower Defense 1/2/5 and the five Henry Stickmin
+  games (Breaking The Bank, Escaping The Prison, Stealing The Diamond,
+  Infiltrating The Airship, Fleeing The Complex). Their builds are the packed
+  SWFs in `g/g/Ruffle/swfs/`, shipped beside each app's tiny Gams loader
+  shim. That shim is edited **only** in its two loader paths (the SWF data
+  now lives beside it; the player is shared as `apps/tools/ruffle-flash-player/`)
+  — nothing else in it changed.
+- **WebGL builds** — Tunnel Rush and Grey Box Testing (`g/g/tunnelrush/`,
+  `g/g/greybox/`) and Drive Mad (`g/g/drivemad/`), copied folder-for-folder.
+- **Ruffle Flash Player** (`apps/tools/ruffle-flash-player/`) — the shared
+  Flash runtime from `g/g/Ruffle/` (without the `swfs/` library — every Flash
+  game app carries its own build). Ruffle itself is open source, MIT or
+  Apache-2.0 ([ruffle-rs/ruffle](https://github.com/ruffle-rs/ruffle)).
+
+
+Each game is © its respective authors — for example the Henry Stickmin series
+by PuffballsUnited (Innersloth), the Bloons series by Ninja Kiwi, Pac-Man ©
+Bandai Namco, Tetris © Tetris Holding, 2048 by Gabriele Cirulli. The mirrors
+carry **no license granting redistribution**; they are here as the offline
+copies the Gams links point at, and no further rights are claimed or implied.
+The app icons are the Gams collection's own icon images for each game, scaled
+into `data/icons/`.
+
+
+## Vendored Exst Arcade & proton-arcade games
+
+Seventeen games ship from
+[proton-arcade/proton-arcade.github.io](https://github.com/proton-arcade/proton-arcade.github.io)
+(the "Exst Arcade" site), plus one standalone browser game from the same
+`proton-arcade` GitHub account, each into `apps/games/<id>/`: Baldi's
+Basics, Minesweeper, Flappy Bird, Retro Bowl, Drift Boss, Football Bros,
+Five Nights at Freddy's 1–4 and Sister Location, Backrooms, Kart Bros,
+Geometry Dash Lite, Ampler Launcher, Google Dino, Granny and Evolution.
+(Geometry Dash Web, from
+[proton-arcade/gdweb](https://github.com/proton-arcade/gdweb), shipped here
+too until it was removed in 2026-10, with its folder and icon; Geometry Dash
+Lite stays.) For every one of them:
+
+- The game files (`index.html`, `icon.png`) for the Exst Arcade titles are
+  copied byte-for-byte from `website/games/<folder>` in
+  `proton-arcade/proton-arcade.github.io`. Their `icon.png` also serves as
+  the catalog icon at `data/icons/<id>.png`.
+- **Ampler Launcher** (`apps/games/ampler-launcher/`) copies the browser
+  launcher, skins and all seven offline Eaglercraft builds (`1.12.2`,
+  `1.12.2-wasm`, `1.8.8`, `1.8.8-wasm`, `1.5.2`, `Beta-1.3`, `Alpha-1.2.6`)
+  from `website/games/Ealgercraft/Ampler-Launcher/` (the v2.7.4 superset of
+  [proton-arcade/AmplerLauncher](https://github.com/proton-arcade/AmplerLauncher)),
+  omitting non-browser CLI/server helper folders.
+- **Evolution** (`apps/games/evolution/`) copies the runtime web build of
+  Keiwan Donyagard's *Evolution* creature simulator from
+  [proton-arcade/evo](https://github.com/proton-arcade/evo) (`index.html`,
+  `favicon.svg`, `css/`, `js/`, `cc/`); its `favicon.svg` is rasterised to
+  `data/icons/evolution.png`.
+- Each app folder adds only proton's `app.html` wrapper, which frames the
+  game's own `index.html` unsandboxed like every other vendored game.
+- Three source folders omit files their pages reference, so those were
+  supplied from the game's own icon to keep nothing missing:
+  `football-bros` gained `favicon.png`, `manifest.json` and
+  `assets/bw_logo.gif`, `kart-bros` gained `manifest.json`, and `granny`
+  gained `logo.jpg`.
+  `football-bros/index.html` also framed remote pages twice (a Google
+  Tag Manager tracking iframe and an email-signup overlay the game
+  injects); both snippets were removed so no shipped game page frames
+  a remote page. (The uncatalogued `Pong` folder in `proton-arcade.github.io`
+  contains only an HTML shell without its `script.js` or `style.css` and is
+  omitted.)
+- All rights in these games remain with their original creators; this
+  repository grants no rights in that content.
+
+## Vendored BitLife
+
+`apps/games/bitlife/` ships the Unity 2019.4.21f1 WebGL browser build of
+**BitLife — Life Simulator** (by Candywriter), copied from
+[Lugapps-games/bitlife](https://github.com/Lugapps-games/bitlife) (the same
+`Build/` and `TemplateData/` binaries mirrored in
+[bitlifefreeonline/bitlife](https://github.com/bitlifefreeonline/bitlife)):
+
+- `Build/` (`BitLife.data.unityweb`, `BitLife.wasm.code.unityweb`,
+  `BitLife.wasm.framework.unityweb`, `BitLife.json`, `UnityLoader.js`),
+  `TemplateData/`, `logo.png` and `style.css` are copied byte-for-byte.
+- `index.html` omits the broken root `/js/main.js` script tag and adds empty
+  local `<script id="gamemonetize-sdk">` and
+  `<script id="gamedistribution-jssdk">` tags so the Unity framework's
+  `document.getElementById()` guards keep its remote ad SDK loaders dormant
+  without modifying the `.unityweb` archives.
+- `splash.png` (and `data/icons/bitlife.png`) is the 512×512 BitLife icon art.
+- BitLife is © **Candywriter, LLC**; the mirror carries no redistribution
+  licence, and no rights in Candywriter's game or artwork are claimed or
+  implied.
+
+## Vendored game from incrediblerevived11.github.io
+
+One game remains copied from
+[incrediblerevived11/incrediblerevived11.github.io](https://github.com/incrediblerevived11/incrediblerevived11.github.io)
+(the "incrediblewebsite revived" site): **Bitburner**
+(`apps/games/bitburner/`). Forty-four games were originally copied from
+that site; at the maintainer's request the other forty-three were
+removed, and Bitburner is the only one kept.
+
+- Bitburner's game files are copied byte-for-byte from that repository;
+  the only addition is proton's `app.html` wrapper, which frames the
+  game's own page unsandboxed like every other vendored game. It uses a
+  named inline SVG icon rather than a raster icon file.
+- All rights in the game remain with its original creators; this
+  repository grants no rights in that content.
+
+### Embedded-link cleanup (all vendored batches)
+
+Nothing shipped in this repository loads anything from the network:
+no page may embed a remote script, stylesheet, font, tracker or SDK
+(the test suite asserts this over every game page and stylesheet).
+A few vendored pages arrived with such embedded links; the remote
+load — never the game — was removed, each time noted in the game's
+wrapper as well:
+
+- **Cookie Clicker** — the cdnjs cookie-consent script, the Google
+  Fonts stylesheet, the Facebook Pixel snippet and the three AdSense
+  loaders (`googlesyndication`) are gone; the ad slots remain but
+  load nothing.
+- **Drift Boss** — its Google Analytics block is switched off and its
+  Yandex Games SDK URL blanked, so its SDK/analytics loaders stay
+  dormant.
+- **Bitburner** — its Google Analytics snippet was removed (the
+  `ga()` calls are guarded or gone).
+
+Ordinary `<a href>` links to authors' own sites inside games are
+untouched: a reader may follow them, but nothing loads until they do.
+
+## Vendored media player (VLC / libvlc, WebAssembly)
+
+The VLC app (`apps/media/media/`) is a port of the open-source **VLC
+media player** to the browser: playback is done by **libvlc** (VLC's
+engine, © the VideoLAN project) compiled to WebAssembly, vendored from
+the npm package [`libvlc-wasm`](https://www.npmjs.com/package/libvlc-wasm)
+0.2.0 (upstream: github.com/lucasgelfond/libvlc-wasm; the vendored
+engine is built from VLC commit
+`b11917943e3a32578d65edd54f3d12023da29d46`, recorded in
+`apps/media/media/vendor/libvlc/wasm/VLC_COMMIT`):
+
+- `apps/media/media/vendor/libvlc/src/` — the libvlc-wasm JavaScript
+  SDK (MIT, © Lucas Gelfond and contributors; `LICENSE` in that folder);
+- `apps/media/media/vendor/libvlc/wasm/libvlc.js` and `libvlc.wasm` —
+  the compiled libvlc engine. The SDK code is MIT, but the compiled
+  engine links VLC and GPL codec modules, so the binary as a whole is
+  GPL (`COPYING` in that folder);
+- `apps/media/media/vendor/libvlc/fonts/NotoSans-Regular.ttf` — the
+  subtitle font the SDK loads by default (SIL Open Font License; see
+  the upstream package).
+
+The player wears VLC's own artwork: `data/icons/vlc.png` (and the cone
+shown in the app) is the VideoLAN traffic cone, rasterised from the
+Inkscape SVG shipped in
+[addyosmani/vlc.js](https://github.com/addyosmani/vlc.js)
+(`assets/VLC_Icon.svg`, © the VideoLAN project; the cone is VideoLAN's
+trademark, used here to dress a port of their own player). The
+interface copies the classic VLC 3 layout — its menu order and
+light-grey chrome with the VLC orange `#ff7900`.
+
+Nothing in the SDK or engine is modified: `apps/media/media/app.html`
+dynamically imports `vendor/libvlc/src/index.js`, creates one libvlc
+player on the app's canvas, and drives it with VLC-style menus,
+playlist, seek/volume/rate controls, track and subtitle selection —
+files are played by VLC itself, never transcoded or uploaded.
+libvlc's threads need SharedArrayBuffer, hence a cross-origin isolated
+page; GitHub Pages cannot send the COOP/COEP headers, so the app can
+load `coi-serviceworker.js` (the isolation shim from the same package,
+MIT, served from the site root so its service worker can cover the
+site) and reload once to enable the engine. The earlier FFmpeg
+transcoding fallback was removed when the player became VLC.
+
+## Vendored emulator (Web Retro)
+
+The Web Retro app (`apps/tools/web-retro/`) vendors the **webretro** emulator —
+RetroArch compiled for the web by
+[BinBashBanana/webretro](https://github.com/BinBashBanana/webretro)
+(GPL-3.0, webretro 6.5) — as copied into
+[Gams-Offline/Gams](https://github.com/Gams-Offline/Gams) (`g/g/webretro/`):
+
+- `apps/tools/web-retro/webretro/` is that build: `launch.html`, `main.js`, the
+  `cores/` bundles for mupen64plus_next (N64), snes9x (SNES), nestopia (NES)
+  and mgba (GB/GBC/GBA) — the libretro cores are GPL-licensed parts of
+  libretro/RetroArch — and the `assets/` they load, plus the maintainer's
+  own ROM library under `roms/` (next point). The GIMP source
+  `controller_layout.xcf` is not a runtime asset and is omitted; everything
+  else is byte-for-byte as upstream, except for the proton changes below.
+  In `assets/base.css`: the menu-bar back arrow is drawn larger than
+  upstream (28px glyph, wider click target) so it is easy to hit.
+  In `main.js`: bindings changed in RetroArch's own menu are harvested
+  from the `retroarch.cfg` it writes back into the keybind manager's
+  localStorage entry (`harvestKeybindsFromConfigText` /
+  `persistKeybindsFromConfig`), so control bindings persist between
+  games instead of resetting on every launch; and the Start-button
+  gate in `readyForInit` is removed, so a launched game boots straight
+  in instead of waiting for a click on Start (upstream waits for the
+  click only so the audio context may start; here the game starts
+  muted and audio follows the first input in the frame).
+  In `launch.html`: the
+  menu-bar back arrow posts a `webretro-back` message to the proton
+  launcher instead of linking to `.` (webretro's own core-select page,
+  which proton does not ship, so the link 404'd). The core/wasm
+  wrappers are Gams' `file://`-friendly packaging of those files.
+- `apps/tools/web-retro/app.html` is proton's launcher, adapted from Gams'
+  `g/webretro.html`: the same core list and BroadcastChannel ROM hand-off to
+  `webretro/launch.html?rom=channel`, with the UI rebuilt on proton's widgets
+  and the ROM name URL-encoded. The ROM can come from either file system —
+  the device's own file picker, or the proton virtual file system (proton
+  Files, read with `FS.readBlob`) — or from the bundled library, which is
+  fetched from `roms/` and handed over the same channel.
+- The app icon is Gams' `img/webretro.png`, saved as
+  `data/icons/webretro.png` and set as the catalog default
+  (`icon=data/icons/webretro.png`, `svg-icon=false`).
+
+**The bundled ROMs are the maintainer's own files.** At the maintainer's
+request, `apps/tools/web-retro/webretro/roms/` carries their own ROM
+library — supplied as `.zip` files, stored here extracted (the archives
+were dropped once the ROMs were unzipped): Mario Kart 64, Mario Party, Paper
+Mario, Doom 64, Yoshi's Story, Super Mario 64, Banjo-Kazooie and
+Super Smash Bros. (N64); Excitebike, Super Mario Bros. + Duck Hunt,
+Super Mario Bros. 2, Super Mario Bros. 3, Tetris, Castlevania, Contra,
+Mega Man 2 and Metroid (NES); Super Mario World, The Legend of
+Zelda: A Link to the Past, Donkey Kong Country, Super Metroid and
+Chrono Trigger (SNES); Doom, Grand Theft Auto Advance, LEGO Star Wars:
+The Video Game, Pokémon Emerald and Super Mario Advance (GBA); Grand Theft
+Auto, Grand Theft Auto 2, Pokémon Red, Pokémon Yellow, Pokémon Crystal,
+Space Invaders and Super Mario Bros. Deluxe (Game Boy/Color). Their box
+art (also maintainer-supplied) lives in `data/icons/` and fronts them in
+the launcher. Those are commercial games © Nintendo, id Software,
+Rockstar Games, The Pokémon Company, Electronic Arts, Activision, LEGO
+and their respective rights holders: this repository grants no rights in
+them, and they are mirrored here as the maintainer's own library. Web
+Retro still runs any ROM file you choose — from your own device or from
+proton's virtual file system — handed to the emulator in-page over a
+BroadcastChannel; those never leave the browser. If you hold rights in a
+bundled ROM and want it removed, open an issue or pull request and it
+will be taken down. (An earlier bundled library copied from the Gams
+catalog, and the Super Mario RPG launcher game that used it, were
+removed in 2026-10 and are not part of this library.)
+
+The webretro files stay under their upstream licence (GPL-3.0, © the webretro
+and libretro authors) and are distributed here as a separate part of this
+AGPL-3.0-only repository — GPL-3.0 section 13 permits the combination. Their
+in-file source headers and upstream links are unchanged. Not affiliated with
+Nintendo or the libretro organisation.
+
+## Vendored AI workspace (Mox)
+
+The Mox app (`apps/productivity/mox/`) and the panel's AI button run
+**Mox**, a private AI workspace by Math-halper. Its browser files are copied
+byte-for-byte from [Math-halper/mox](https://github.com/Math-halper/mox) at
+commit `acd4ec7ab143f0c5a31b11dd19fb2a89cf5a8eb3` into
+`apps/productivity/mox/website/`:
+
+- **Mox's own files, © Math-halper.** These are the page and its modules
+  (`index.html`, `styles.css`, `app.js`, `calculator.js`, `model-store.js`,
+  `svg.js`, `workspace.js`), Mox's `README.md`, the model manifest, and the
+  knowledge library (`knowledge/`: 55 Markdown documents of original text
+  written for Mox, plus their `index.json`). Mox has no licence file of its
+  own yet (its README says so), so this repository grants no rights in them.
+  They ship here as the maintainer's own project.
+- **The model.** `models/smollm2-135m-instruct-q4_1.gguf` is a Q4_1 GGUF
+  quantisation of
+  [SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct)
+  by Hugging Face (Apache-2.0).
+- **The engine.** `vendor/wllama/` is
+  [wllama](https://github.com/ngxson/wllama) (MIT, © the wllama authors), the
+  WebAssembly build of [llama.cpp](https://github.com/ggml-org/llama.cpp)
+  (MIT, © the ggml authors) that runs the model in the browser.
+- **PDF reading.** `vendor/pdfjs/` is Mozilla's
+  [PDF.js](https://github.com/mozilla/pdf.js) (Apache-2.0; `LICENSE` in that
+  folder), which Mox uses to read imported PDFs.
+- **Optional models are not bundled.** The larger models in Mox's picker are
+  Qwen (Apache-2.0) and Llama 3.2 1B (Llama 3.2 Community Licence). Mox
+  downloads them from Hugging Face only when a user asks for one.
+
+Some files are left out because they are not part of the page a browser
+runs: Mox's launchers (`run.py`, `start-mox.bat`, `start-mox.command`),
+`tests/`, `tools/`, `.github/`, `_headers`, `.nojekyll` and `.gitignore`.
+Mox's offline service worker, `sw.js`, is left out too, because it would sit
+between proton and the page. proton frames Mox with `?nosw`, Mox's own switch
+for not registering that worker. Nothing that ships is edited: proton adds
+only the wrapper (`app.html`) and a `README.md` next to `website/`.
+
+The AI button is proton's own code (`assets/core.js`, `assets/styles.css`):
+the sparkle in the panel and the docked, resizable pane that frames Mox the
+way the Copilot button does on Windows. The `sparkle` and `app-window` icons
+in `assets/icons.js` are proton's own drawings. Copilot and Windows are
+trademarks of Microsoft; proton is not affiliated with Microsoft.
