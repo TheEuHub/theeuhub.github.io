@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruffle Flash Player - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Ruffle Flash Player</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: ruffle-flash-player — frames the vendored Ruffle Flash
+ * emulator (Gams-Offline/Gams g/g/Ruffle/) and hands local .swf/.spl files to
+ * player.html over a BroadcastChannel or frames Ruffle.html directly. */
+'use strict';
+
+/* ============================ RUFFLE FLASH PLAYER ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    const RUFFLE_PAGE = 'apps/tools/ruffle-flash-player/Ruffle.html';
+    const PLAYER_PAGE = 'apps/tools/ruffle-flash-player/player.html';
+    let bc = null;
+
+    body.innerHTML = `${bar('Ruffle Flash Player', `
+      <button type="button" class="btn sm" id="rf-open">${iconSvg('folder-open')} Open SWF…</button>
+      <button type="button" class="btn sm" id="rf-reset">${iconSvg('refresh')} Home</button>
+      <a class="btn sm primary" id="rf-ext" href="${MH.esc(RUFFLE_PAGE)}" target="_blank" rel="noopener">${iconSvg('external')} Open in new tab</a>
+      <input type="file" id="rf-file" accept=".swf,.spl" hidden>
+    `)}
+    <iframe id="rf-frame" class="site-frame" src="${MH.esc(RUFFLE_PAGE)}" title="Ruffle Flash Player" allowfullscreen style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#000"></iframe>`;
+
+    const frame = body.querySelector('#rf-frame');
+    const fileInput = body.querySelector('#rf-file');
+    const extBtn = body.querySelector('#rf-ext');
+
+    const closeChannel = () => {
+      if (bc) {
+        try { bc.close(); } catch {}
+        bc = null;
+      }
+    };
+
+    const launchSwfBlob = (blob) => {
+      closeChannel();
+      const ch = 'rf_' + Math.random().toString(36).slice(2, 12);
+      bc = new BroadcastChannel(ch);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataURL = reader.result;
+        const src = `${PLAYER_PAGE}?channel=${encodeURIComponent(ch)}`;
+        frame.src = src;
+        extBtn.href = RUFFLE_PAGE;
+        frame.onload = () => {
+          try { bc?.postMessage({ type: 'swf', data: dataURL }); } catch {}
+        };
+        bc.onmessage = (ev) => {
+          if (ev.data?.type === 'close') closeChannel();
+        };
+      };
+      reader.readAsDataURL(blob);
+    };
+
+    body.querySelector('#rf-open').onclick = () => {
+      MH.askFileSource('open').then((src) => {
+        if (src === 'device') fileInput.click();
+        else if (src === 'vfs') {
+          MH.vfsPick({ title: 'Open Flash file (.swf / .spl)', accept: '.swf,.spl' }).then(async (p) => {
+            if (!p) return;
+            const blob = await FS.readBlob(p);
+            launchSwfBlob(blob);
+          });
+        }
+      });
+    };
+
+    fileInput.onchange = () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      launchSwfBlob(f);
+      fileInput.value = '';
+    };
+
+    body.querySelector('#rf-reset').onclick = () => {
+      closeChannel();
+      frame.onload = null;
+      frame.src = RUFFLE_PAGE;
+    };
+
+    body.onDestroy = closeChannel;
+  },
+});
+</script>
+</body>
+</html>

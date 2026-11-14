@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Retro - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Web Retro</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: web-retro — the launcher flow is adapted from
+ * Gams-Offline/Gams g/webretro.html: pick a core, choose a ROM, then hand the
+ * file to webretro/launch.html over a BroadcastChannel (?rom=channel) — the
+ * ROM never crosses the network, and bundled games launch directly from
+ * webretro/roms/. */
+'use strict';
+
+/* ============================ WEB RETRO ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    const LAUNCH = 'apps/tools/web-retro/webretro/launch.html';
+    const CONSOLES = [
+      { id: 'NES', core: 'nestopia', label: 'NES', sub: 'Nintendo Entertainment System' },
+      { id: 'SNES', core: 'snes9x', label: 'SNES', sub: 'Super Nintendo' },
+      { id: 'N64', core: 'mupen64plus_next', label: 'N64', sub: 'Nintendo 64' },
+      { id: 'GB', core: 'mgba', label: 'GB', sub: 'Game Boy / GBC / GBA' },
+    ];
+    const CORE_TO_LABEL = Object.fromEntries(CONSOLES.map((c) => [c.core, c.label]));
+    const BUNDLED = [
+      ['Castlevania (USA) (Rev 1).nes', 'nestopia', 'Castlevania', 'Castlevania'],
+      ['Contra (USA).nes', 'nestopia', 'Contra', 'Contra'],
+      ['Excitebike (Japan, USA).nes', 'nestopia', 'Excitebike', 'excitebike'],
+      ['Mega Man 2 (USA).nes', 'nestopia', 'Mega Man 2', 'mega-man-2'],
+      ['Metroid (USA).nes', 'nestopia', 'Metroid', 'metroid'],
+      ['Super Mario Bros. + Duck Hunt (USA).nes', 'nestopia', 'Super Mario Bros. + Duck Hunt', 'super-mario-bros-duck-hunt'],
+      ['Super Mario Bros. 2 (USA) (Rev 1).nes', 'nestopia', 'Super Mario Bros. 2', 'super-mario-bros-2'],
+      ['Super Mario Bros. 3 (USA) (Rev 1).nes', 'nestopia', 'Super Mario Bros. 3', 'super-mario-bros-3'],
+      ['Tetris (USA) (Tengen) (Unl).nes', 'nestopia', 'Tetris', 'tetris-nes'],
+      ['Chrono Trigger (USA).sfc', 'snes9x', 'Chrono Trigger', 'chrono-trigger'],
+      ['Donkey Kong Country (U) (V1.2) [!].smc', 'snes9x', 'Donkey Kong Country', 'donkey-kong-country'],
+      ['Legend of Zelda, The - A Link to the Past (USA).sfc', 'snes9x', 'The Legend of Zelda: A Link to the Past', 'the-legend-of-zelda-a-link-to-the-past'],
+      ['Super Mario World (U) [!].smc', 'snes9x', 'Super Mario World', 'super-mario-world'],
+      ['Super Metroid (Japan, USA) (En,Ja).sfc', 'snes9x', 'Super Metroid', 'super-metroid'],
+      ['Banjo-Kazooie (USA) (Rev 1).z64', 'mupen64plus_next', 'Banjo-Kazooie', 'banjo-kazooie'],
+      ['Doom 64 (USA) (Rev 1).z64', 'mupen64plus_next', 'Doom 64', 'doom-64'],
+      ['Mario Kart 64 (USA).z64', 'mupen64plus_next', 'Mario Kart 64', 'mario-kart-64'],
+      ['Mario Party (USA).z64', 'mupen64plus_next', 'Mario Party', 'mario-party'],
+      ['Paper Mario (USA).z64', 'mupen64plus_next', 'Paper Mario', 'paper-mario'],
+      ['Super Mario 64 (USA).z64', 'mupen64plus_next', 'Super Mario 64', 'super-mario-64'],
+      ['Super Smash Bros. (USA).z64', 'mupen64plus_next', 'Super Smash Bros.', 'super-smash-bros'],
+      ['Yoshi\'s Story (USA) (En,Ja).z64', 'mupen64plus_next', 'Yoshi\'s Story', 'yoshis-story'],
+      ['Doom (USA, Europe).gba', 'mgba', 'Doom', 'doom-gba'],
+      ['Grand Theft Auto (USA) (GB Compatible).gbc', 'mgba', 'Grand Theft Auto', 'grand-theft-auto'],
+      ['Grand Theft Auto 2 (USA).gbc', 'mgba', 'Grand Theft Auto 2', 'grand-theft-auto-2'],
+      ['Grand Theft Auto Advance (USA).gba', 'mgba', 'Grand Theft Auto Advance', 'grand-theft-auto-advance'],
+      ['LEGO Star Wars - The Video Game (USA, Europe) (En,Fr,De,Es,It,Nl,Da).gba', 'mgba', 'LEGO Star Wars: The Video Game', 'lego-star-wars-the-video-game'],
+      ['Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc', 'mgba', 'Pokemon Crystal', 'pokemon-crystal'],
+      ['Pokemon - Emerald Version (USA, Europe).gba', 'mgba', 'Pokemon Emerald', 'pokemon-emerald'],
+      ['Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb', 'mgba', 'Pokemon Red', 'pokemon-red'],
+      ['Pokemon - Yellow Version - Special Pikachu Edition (USA, Europe) (GBC,SGB Enhanced).gb', 'mgba', 'Pokemon Yellow', 'pokemon-yellow'],
+      ['Space Invaders (USA) (SGB Enhanced).gb', 'mgba', 'Space Invaders', 'space-invaders'],
+      ['Super Mario Advance (USA, Europe).gba', 'mgba', 'Super Mario Advance', 'super-mario-advance'],
+      ['Super Mario Bros. Deluxe (USA, Europe) (Rev 1).gbc', 'mgba', 'Super Mario Bros. Deluxe', 'super-mario-bros-deluxe'],
+    ];
+
+    let activeTab = 'roms';
+    let selectedConsole = 'NES';
+    let selectedCore = 'nestopia';
+    let vfsDir = FS.home();
+    let bc = null;
+
+    body.innerHTML = `<style>
+      .wr-root{flex:1;min-height:0;display:flex;flex-direction:column;background:#080808}
+      .wr-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:14px;gap:14px}
+      .wr-consoles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:100%}
+      .wr-console{border:1px solid #3a3a3a;background:#141414;color:#fff;border-radius:10px;padding:14px 10px;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}
+      .wr-console:hover{background:#222}
+      .wr-console.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+      .wr-console strong{font-size:17px}
+      .wr-console small{font-size:11.5px;opacity:.78}
+      .wr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+      .wr-card{border:1px solid #2e2e2e;background:#121212;color:#fff;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:7px;text-align:left}
+      .wr-card:hover{background:#1f1f1f;border-color:#555}
+      .wr-card img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#000}
+      .wr-card span{font-size:12.5px;font-weight:600;line-height:1.25}
+      .wr-topbar{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+      .wr-topbar .wr-back{font-size:28px;min-width:56px;min-height:48px;border:1px solid #444;background:#161616;color:#fff;border-radius:8px;display:grid;place-items:center}
+      .wr-topbar .wr-back:hover{background:#262626}
+      .wr-sources{display:flex;flex-wrap:wrap;gap:10px}
+      .wr-vfs{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+      .wr-vfs button{border:1px solid #2d2d2d;background:#121212;color:#fff;padding:7px 10px;border-radius:6px;text-align:left;display:flex;align-items:center;gap:8px}
+      .wr-vfs button:hover{background:#202020}
+    </style>
+    ${bar('Web Retro', `
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn sm primary" data-wr-tab="roms">ROMs</button>
+        <button type="button" class="btn sm" data-wr-tab="emulators">Emulators</button>
+      </div>
+      <button type="button" class="btn sm" id="wr-again" hidden>${iconSvg('refresh')} Change game</button>
+      <a class="btn sm" id="wr-ext" href="${MH.esc(LAUNCH)}" target="_blank" rel="noopener">${iconSvg('external')} Open in new tab</a>
+      <input type="file" id="wr-file" hidden>
+    `)}
+    <div class="wr-root" id="wr-root">
+      <div class="wr-body" id="wr-chooser">
+        <div id="wr-roms">
+          <div class="wr-consoles" id="wr-rom-consoles">
+            ${CONSOLES.map((c) => `<button type="button" class="wr-console${c.id === 'NES' ? ' on' : ''}" data-console="${c.id}"><strong>${c.label}</strong><small>${c.sub}</small></button>`).join('')}
+          </div>
+          <div class="wr-grid" id="wr-grid" style="margin-top:14px"></div>
+        </div>
+        <div id="wr-emulators" hidden>
+          <div id="wr-emu-home">
+            <div class="wr-consoles">
+              ${CONSOLES.map((c) => `<button type="button" class="wr-console" data-core="${c.core}"><strong>${c.label}</strong><small>${c.sub}</small></button>`).join('')}
+            </div>
+          </div>
+          <div id="wr-upload" hidden>
+            <div class="wr-topbar">
+              <button type="button" class="wr-back" id="wr-back" title="Back">&#9664;</button>
+              <h3 style="margin:0"><span id="wr-corename">NES</span> — Choose a ROM</h3>
+            </div>
+            <div class="wr-sources">
+              <button type="button" class="btn" data-src="vfs">${iconSvg('folder-open')} proton Files</button>
+              <button type="button" class="btn" data-src="device">${iconSvg('upload')} This computer</button>
+            </div>
+            <div id="wr-vfs-wrap" hidden>
+              <div class="muted" id="wr-vfs-cwd" style="margin-top:10px;font-size:12.5px"></div>
+              <div class="wr-vfs" id="wr-vfs-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="wr-stage" style="flex:1;min-height:0;display:none;flex-direction:column"></div>
+    </div>`;
+
+    const romsPane = body.querySelector('#wr-roms');
+    const emusPane = body.querySelector('#wr-emulators');
+    const emuHome = body.querySelector('#wr-emu-home');
+    const uploadPane = body.querySelector('#wr-upload');
+    const coreNameEl = body.querySelector('#wr-corename');
+    const gridEl = body.querySelector('#wr-grid');
+    const chooserEl = body.querySelector('#wr-chooser');
+    const stageEl = body.querySelector('#wr-stage');
+    const again = body.querySelector('#wr-again');
+    const extBtn = body.querySelector('#wr-ext');
+    const fileInput = body.querySelector('#wr-file');
+    const vfsWrap = body.querySelector('#wr-vfs-wrap');
+    const vfsCwdEl = body.querySelector('#wr-vfs-cwd');
+    const vfsListEl = body.querySelector('#wr-vfs-list');
+
+    const closeChannel = () => {
+      if (bc) {
+        try { bc.close(); } catch {}
+        bc = null;
+      }
+    };
+
+    const setTab = (tab) => {
+      activeTab = tab;
+      body.querySelectorAll('[data-wr-tab]').forEach((b) => {
+        b.classList.toggle('primary', b.dataset.wrTab === tab);
+      });
+      romsPane.hidden = tab !== 'roms';
+      emusPane.hidden = tab !== 'emulators';
+    };
+
+    const renderGrid = () => {
+      const targetCore = CONSOLES.find((c) => c.id === selectedConsole)?.core || 'nestopia';
+      const items = BUNDLED.filter(([, core]) => core === targetCore);
+      gridEl.innerHTML = items.map(([rom, core, title, art]) => `
+        <button type="button" class="wr-card" data-bundled="${MH.esc(rom)}" data-bcore="${MH.esc(core)}">
+          <img src="data/icons/${MH.esc(art)}.jpeg" alt="${MH.esc(title)}">
+          <span>${MH.esc(title)}</span>
+        </button>`).join('');
+      gridEl.querySelectorAll('[data-bundled]').forEach((btn) => {
+        btn.onclick = () => {
+          const url = `${LAUNCH}?core=${encodeURIComponent(btn.dataset.bcore)}&rom=${encodeURIComponent(btn.dataset.bundled)}`;
+          launchFrame(url);
+        };
+      });
+    };
+
+    const renderVfs = () => {
+      vfsWrap.hidden = false;
+      vfsCwdEl.textContent = vfsDir;
+      vfsListEl.innerHTML = '';
+      if (vfsDir !== '/') {
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.dataset.dir = FS.dirname(vfsDir);
+        up.innerHTML = `${iconSvg('chevron-left')} ..`;
+        up.onclick = () => { vfsDir = FS.dirname(vfsDir); renderVfs(); };
+        vfsListEl.appendChild(up);
+      }
+      for (const item of FS.list(vfsDir)) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        if (item.type === 'dir') {
+          b.dataset.dir = item.path;
+          b.innerHTML = `${iconSvg('folder')} ${MH.esc(item.name)}`;
+          b.onclick = () => { vfsDir = item.path; renderVfs(); };
+        } else {
+          b.dataset.file = item.path;
+          b.innerHTML = `${iconSvg('file')} ${MH.esc(item.name)}`;
+          b.onclick = async () => {
+            const blob = await FS.readBlob(item.path);
+            const file = new File([blob], item.name, { type: blob.type || 'application/octet-stream' });
+            launchChannelRom(selectedCore, file);
+          };
+        }
+        vfsListEl.appendChild(b);
+      }
+    };
+
+    const launchFrame = (src) => {
+      chooserEl.style.display = 'none';
+      stageEl.style.display = 'flex';
+      stageEl.innerHTML = `<iframe id="wr-frame" class="site-frame" src="${MH.esc(src)}" title="Web Retro" allowfullscreen style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#000"></iframe>`;
+      again.hidden = false;
+      extBtn.href = src;
+    };
+
+    const launchChannelRom = (core, romFile) => {
+      closeChannel();
+      const ch = 'wr_' + Math.random().toString(36).slice(2, 12);
+      bc = new BroadcastChannel(ch);
+      const nameNoExt = romFile.name.replace(/\.[^.]+$/, '');
+      const url = `${LAUNCH}?core=${encodeURIComponent(core)}&rom=channel&name=${encodeURIComponent(nameNoExt)}&channel=${encodeURIComponent(ch)}`;
+      bc.onmessage = (ev) => {
+        if (ev.data?.status === 'ready') {
+          try { bc?.postMessage({ rom: romFile }); } catch {}
+        }
+      };
+      launchFrame(url);
+    };
+
+    const picker = () => {
+      closeChannel();
+      stageEl.innerHTML = '';
+      stageEl.style.display = 'none';
+      chooserEl.style.display = 'flex';
+      again.hidden = true;
+      extBtn.href = LAUNCH;
+      setTab('roms');
+    };
+
+    again.addEventListener('click', picker);
+
+    const onWindowMessage = (event) => {
+      const frame = stageEl.querySelector('#wr-frame');
+      if (!frame || !event.data || event.data.type !== 'webretro-back') return;
+      if (event.source === frame.contentWindow) picker();
+    };
+    window.addEventListener('message', onWindowMessage);
+
+    body.querySelectorAll('[data-wr-tab]').forEach((b) => {
+      b.onclick = () => setTab(b.dataset.wrTab);
+    });
+
+    body.querySelectorAll('#wr-rom-consoles [data-console]').forEach((b) => {
+      b.onclick = () => {
+        selectedConsole = b.dataset.console;
+        body.querySelectorAll('#wr-rom-consoles [data-console]').forEach((x) => {
+          x.classList.toggle('on', x === b);
+        });
+        renderGrid();
+      };
+    });
+
+    body.querySelectorAll('#wr-emu-home [data-core]').forEach((b) => {
+      b.onclick = () => {
+        selectedCore = b.dataset.core;
+        coreNameEl.textContent = CORE_TO_LABEL[selectedCore] || selectedCore;
+        emuHome.hidden = true;
+        uploadPane.hidden = false;
+        vfsWrap.hidden = true;
+      };
+    });
+
+    body.querySelector('#wr-back').onclick = () => {
+      uploadPane.hidden = true;
+      emuHome.hidden = false;
+    };
+
+    body.querySelector('[data-src="device"]').onclick = () => fileInput.click();
+    body.querySelector('[data-src="vfs"]').onclick = () => renderVfs();
+    fileInput.onchange = () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      launchChannelRom(selectedCore, f);
+      fileInput.value = '';
+    };
+
+    body.onDestroy = () => {
+      closeChannel();
+      window.removeEventListener('message', onWindowMessage);
+    };
+
+    renderGrid();
+  },
+});
+</script>
+</body>
+</html>
