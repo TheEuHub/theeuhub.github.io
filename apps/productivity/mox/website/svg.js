@@ -819,3 +819,50 @@ export const svgAPI = {
   shapes: [...DRAWABLE],
   examples: [...DRAW_EXAMPLES]
 };
+
+/* ------------------------------------------------------------------- UI icons */
+
+export const MOX_ICONS = {
+  brand: '<path d="M12 2.4L14.2 9.8L21.6 12L14.2 14.2L12 21.6L9.8 14.2L2.4 12L9.8 9.8Z"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>',
+  newChat: '<path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M18.3 3.7a1.8 1.8 0 0 1 2.5 2.5L12.4 14.6 9 15.4l.8-3.4 8.5-8.3Z"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  code: '<path d="m8.2 7.8-4.2 4.2 4.2 4.2"/><path d="m15.8 7.8 4.2 4.2-4.2 4.2"/><path d="m13.6 5.5-3.2 13"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7"/><circle cx="9" cy="12" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r=".95" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r=".95" fill="currentColor" stroke="none"/><circle cx="9" cy="15.8" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="15.8" r=".95" fill="currentColor" stroke="none"/><path d="M15 14.8v2.6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M12 10.5v5M9.5 13h5"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/>',
+  shield: '<path d="M12 3 5 6v5.5c0 4.6 3 8.4 7 9.5 4-1.1 7-4.9 7-9.5V6l-7-3Z"/><path d="m9.5 12 1.8 1.8 3.5-3.6"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>',
+  chip: '<rect x="7" y="7" width="10" height="10" rx="1.8"/><path d="M10.2 10.2h3.6v3.6h-3.6zM9 3.5V7M15 3.5V7M9 17v3.5M15 17v3.5M3.5 9H7M3.5 15H7M17 9h3.5M17 15h3.5"/>',
+  send: '<path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.6-2.5 2-2.5 3.6"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>',
+  draw: '<path d="M12 3.5 4.5 19.5l7.5-3 7.5 3L12 3.5Z"/><path d="M12 3.5v13"/>',
+  library: '<path d="M4.5 19.5v-15A2.5 2.5 0 0 1 7 2h12.5v18H7a2.5 2.5 0 0 0-2.5 2Z"/><path d="M8.5 7h7M8.5 11h5"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  pdf: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M8.5 17v-5h2a1.5 1.5 0 0 1 0 3h-2"/>',
+  css: '<path d="M9 5 7 19M17 5l-2 14M4.5 9.5h15M3.5 14.5h15"/>',
+  js: '<path d="M13 3 6 14h5l-1 7 8-11h-5V3Z"/>',
+  json: '<path d="M9 4C7.5 4 7 5 7 6.5V10c0 1-1 2-2 2 1 0 2 1 2 2v3.5C7 19 7.5 20 9 20M15 4c1.5 0 2 1 2 2.5V10c0 1 1 2 2 2-1 0-2 1-2 2v3.5c0 1.5-.5 2.5-2 2.5"/>',
+  svg: '<path d="m12 3.5 8 8.5-8 8.5-8-8.5 8-8.5Z"/><circle cx="12" cy="12" r="2"/>',
+  close: '<path d="m6 6 12 12M18 6 6 18"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0 2 5.3M20 4v7h-7"/>',
+  check: '<path d="m5 12 4.5 4.5L19 7"/>',
+  alert: '<path d="M12 4 3.2 19.5h17.6L12 4Z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.2" r=".8" fill="currentColor" stroke="none"/>',
+  external: '<path d="M14 5h5v5M19 5l-9 9M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"/>',
+  desktop: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  tablet: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="17.5" r=".8" fill="currentColor" stroke="none"/>',
+  phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10.5 18h3"/>',
+  terminal: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7.5 10 3 2.5-3 2.5M12.5 15h4"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.3-4.6A8 8 0 1 1 21 12Z"/>',
+  list: '<path d="M4 7h16M4 12h12M4 17h9"/>'
+};
+
+/** Render a crisp custom inline SVG icon for Mox's UI. */
+export function moxIcon(name, className = 'mox-ico') {
+  const body = MOX_ICONS[name] || MOX_ICONS.brand;
+  const cls = className ? ` class="${className}"` : '';
+  return `<svg${cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}

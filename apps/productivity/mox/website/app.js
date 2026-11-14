@@ -14,8 +14,18 @@ import {
 } from './model-store.js';
 import {
   drawingIntent, drawingAnswer, drawSVG, resolveDrawTags, hydrateSVGFigures, svgAPI,
-  DRAWABLE, DRAW_EXAMPLES
+  DRAWABLE, DRAW_EXAMPLES, moxIcon
 } from './svg.js';
+
+const isSideHelpMode = (() => {
+  if (document.documentElement.classList.contains('mox-side-help')) return true;
+  try {
+    return window.frameElement?.id === 'copilot-frame' || location.search.includes('mode=help');
+  } catch {
+    return location.search.includes('mode=help');
+  }
+})();
+if (isSideHelpMode) document.documentElement.classList.add('mox-side-help');
 
 const WLLAMA_URL = new URL('vendor/wllama/wllama.js', import.meta.url).href;
 const WLLAMA_WASM = new URL('vendor/wllama/wllama.wasm', import.meta.url).href;
@@ -187,7 +197,11 @@ const elements = {
   chatList: $('#chatList'), chatEmpty: $('#chatEmpty'),
   sidebarToggle: $('#sidebarToggle'), sidebarScrim: $('#sidebarScrim'), srStatus: $('#srStatus'),
   modal: $('#modalBackdrop'), modalTitle: $('#modalTitle'),
-  modalKicker: $('#modalKicker'), modalCopy: $('#modalCopy'), modalDone: $('#modalDone'), toast: $('#toast')
+  modalKicker: $('#modalKicker'), modalCopy: $('#modalCopy'), modalDone: $('#modalDone'), toast: $('#toast'),
+  sideHelpStatus: $('#sideHelpStatus'), sideHelpStatusBox: $('#sideHelpStatusBox'),
+  sideHelpStatusText: $('#sideHelpStatusText'), sideHelpProgressBar: $('#sideHelpProgressBar'),
+  sideHelpRetry: $('#sideHelpRetry'), sideHelpNewChat: $('#sideHelpNewChat'),
+  sideHelpMenuBtn: $('#sideHelpMenuBtn'), sideHelpList: $('#sideHelpList')
 };
 
 let db;
@@ -519,15 +533,15 @@ function renderLibraryChips() {
 
 function renderSources() {
   if (!userDocuments.length) {
-    elements.sourceList.innerHTML = '<div class="empty-sources"><span class="folder-art">▱</span><span>No files added yet</span><small>Add a folder to give Mox more context</small></div>';
+    elements.sourceList.innerHTML = `<div class="empty-sources"><span class="folder-art">${moxIcon('folder', 'mox-ico')}</span><span>No files added yet</span><small>Add a folder to give Mox more context</small></div>`;
     return;
   }
   elements.sourceList.innerHTML = userDocuments.map((doc) =>
     `<div class="source-item" title="${escapeHTML(doc.name)}">
-      <span class="source-file-icon">${doc.name.toLowerCase().endsWith('.pdf') ? '▤' : '▧'}</span>
+      <span class="source-file-icon">${moxIcon(doc.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'file', 'mox-ico')}</span>
       <span class="source-item-name">${escapeHTML(doc.name)}</span>
       <span class="source-size">${displaySize(doc.bytes)}</span>
-      <button class="source-remove" data-remove="${escapeHTML(doc.id)}" title="Remove ${escapeHTML(doc.name)}" aria-label="Remove ${escapeHTML(doc.name)}">×</button>
+      <button class="source-remove" data-remove="${escapeHTML(doc.id)}" title="Remove ${escapeHTML(doc.name)}" aria-label="Remove ${escapeHTML(doc.name)}">${moxIcon('close', 'mox-ico')}</button>
     </div>`
   ).join('');
   elements.sourceList.querySelectorAll('[data-remove]').forEach((button) => {
@@ -760,10 +774,19 @@ function retrieve(query, limit = MAX_EXCERPTS) {
 function setModelStatus(state, text) {
   elements.modelDot.className = `status-dot ${state}`;
   elements.sidebarStatus.textContent = text;
+  if (elements.sideHelpStatus) {
+    elements.sideHelpStatus.textContent = state === 'ready' ? 'Ready' : state === 'error' ? 'Search only' : state === 'idle' ? 'Idle' : 'Loading…';
+    elements.sideHelpStatus.classList.toggle('ready', state === 'ready');
+  }
+  if (elements.sideHelpStatusBox) {
+    elements.sideHelpStatusBox.hidden = state === 'ready';
+    if (elements.sideHelpStatusText) elements.sideHelpStatusText.textContent = text;
+    if (elements.sideHelpRetry) elements.sideHelpRetry.hidden = state !== 'error';
+  }
 }
 function setSourceBadge(kind, text) {
   elements.sourceBadge.className = `source-badge ${kind}`;
-  elements.sourceBadge.textContent = text;
+  elements.sourceBadge.innerHTML = `${moxIcon('chip', 'mox-ico')}<span>${escapeHTML(text)}</span>`;
 }
 
 async function readModelManifest() {
@@ -863,9 +886,10 @@ async function createEngine() {
 async function startModel({ auto = false } = {}) {
   if (modelReady || generating || elements.load.disabled) return;
   elements.load.disabled = true;
-  elements.load.innerHTML = '<span class="button-sparkle">✳</span> Loading model…';
+  elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('brand', 'mox-ico')}</span> Loading model…`;
   elements.progress.hidden = false;
   elements.progressBar.style.width = '0%';
+  if (elements.sideHelpProgressBar) elements.sideHelpProgressBar.style.width = '0%';
   elements.progressPercent.textContent = '0%';
   elements.modelTitle.textContent = 'Loading the bundled model';
   elements.progressLabel.textContent = 'Reading models/manifest.json…';
@@ -893,8 +917,9 @@ async function startModel({ auto = false } = {}) {
       if (!record?.blob) throw new Error(`${model.name} is no longer in this browser. Upload it again.`);
       blob = record.blob;
       elements.progressBar.style.width = '60%';
+      if (elements.sideHelpProgressBar) elements.sideHelpProgressBar.style.width = '60%';
       elements.progressPercent.textContent = '…';
-      setSourceBadge('local', '◈ your model');
+      setSourceBadge('local', 'your model');
     } else {
       elements.progressLabel.textContent = `Fetching ${model.file} from this site`;
       const response = await fetch(`models/${model.file}`);
@@ -911,9 +936,11 @@ async function startModel({ auto = false } = {}) {
           received += value.length;
           const percent = Math.min(99, Math.round((received / total) * 100));
           elements.progressBar.style.width = `${percent}%`;
+          if (elements.sideHelpProgressBar) elements.sideHelpProgressBar.style.width = `${percent}%`;
           elements.progressPercent.textContent = `${percent}%`;
           elements.progressLabel.textContent = `Fetching ${model.file} · ${displaySize(received)} of ${displaySize(total)}`;
-          setSourceBadge('local', `◈ model ${percent}%`);
+          setSourceBadge('local', `model ${percent}%`);
+          if (elements.sideHelpStatusText) elements.sideHelpStatusText.textContent = `Loading chat model (${percent}%)…`;
         }
         blob = new Blob(chunks);
       } else {
@@ -924,6 +951,7 @@ async function startModel({ auto = false } = {}) {
     // 2. Start llama.cpp in WebAssembly and load the weights.
     elements.progressLabel.textContent = 'Starting the inference engine…';
     elements.progressPercent.textContent = '…';
+    if (elements.sideHelpStatusText) elements.sideHelpStatusText.textContent = 'Starting chat engine…';
     engine = await createEngine();
     const threads = Math.max(1, Math.min(8, navigator.hardwareConcurrency || 2));
     elements.progressLabel.textContent = `Loading weights (${threads} thread${threads === 1 ? '' : 's'})…`;
@@ -938,16 +966,17 @@ async function startModel({ auto = false } = {}) {
     modelReady = true;
     searchOnly = false;
     elements.progressBar.style.width = '100%';
+    if (elements.sideHelpProgressBar) elements.sideHelpProgressBar.style.width = '100%';
     elements.progressPercent.textContent = 'Ready';
     elements.progressLabel.textContent = 'Model loaded on this device';
     elements.modelTitle.textContent = 'Mox is ready';
     elements.modelDescription.textContent = `${describeModel()} is running in this browser. Questions, your files, and the knowledge library stay on this device.`;
     elements.modelSize.textContent = 'Loaded';
-    elements.modelFootnote.innerHTML = `<span>◉</span> Served by this site · ${threads} thread${threads === 1 ? '' : 's'} · works offline after the first load`;
-    elements.load.innerHTML = '<span class="button-sparkle">✓</span> Model loaded';
+    elements.modelFootnote.textContent = `Served by this site · ${threads} thread${threads === 1 ? '' : 's'} · works offline after the first load`;
+    elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('check', 'mox-ico')}</span> Model loaded`;
     elements.load.classList.add('loaded');
     elements.load.disabled = true;
-    setSourceBadge('local', '◈ model on this site');
+    setSourceBadge('local', 'model on this site');
     setModelStatus('ready', `${model.name} ready`);
     updateModelMenu();
     updateComposer();
@@ -962,15 +991,36 @@ async function startModel({ auto = false } = {}) {
     elements.progressLabel.textContent = (error.message || 'Model failed to load').slice(0, 150);
     elements.modelSize.textContent = 'Search only';
     elements.load.disabled = false;
-    elements.load.innerHTML = '<span class="button-sparkle">↻</span> Retry the model <span class="button-arrow">↗</span>';
+    elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('refresh', 'mox-ico')}</span> Retry the model <span class="button-arrow">${moxIcon('external', 'mox-ico')}</span>`;
     setModelStatus('error', 'Model unavailable · search only');
-    setSourceBadge('remote', '◈ search only');
+    setSourceBadge('remote', 'search only');
     updateComposer();
     showToast('Model unavailable. Library search still works.');
   }
 }
 
-function buildMessages(question, excerpts) {
+function buildMessages(question, excerpts, calculation = null) {
+  if (calculation) {
+    const exact = calculation.conversion && calculation.conversion !== calculation.text
+      ? calculation.conversion
+      : calculation.text;
+    const calcSystem = [
+      'You are Mox, a helpful assistant running privately in the user\'s browser.',
+      'The exact verified answer to the user\'s question is provided below under VERIFIED ANSWER.',
+      'Answer the user naturally and directly in 1–2 plain sentences stating that exact result.',
+      'Preserve the exact number without changing or guessing it.',
+      'NEVER mention a calculator, calculation tool, or internal computation, and NEVER say "Answered with Calculator" or "Computed by the calculator".',
+      '',
+      'VERIFIED ANSWER:',
+      `Expression: ${calculation.expression}`,
+      `Exact result: ${exact}`
+    ].join('\n');
+    const messages = [{ role: 'system', content: calcSystem }];
+    for (const turn of history.slice(-HISTORY_TURNS)) messages.push(turn);
+    messages.push({ role: 'user', content: question });
+    return messages;
+  }
+
   const grounded = excerpts.length > 0;
   const sources = grounded
     ? excerpts.map((item, index) =>
@@ -980,14 +1030,15 @@ function buildMessages(question, excerpts) {
 
   // The workspace is the user's live code. Only attach the file bodies when the
   // question looks like it is about that code, so ordinary questions stay small.
-  const manifest = workspaceManifest();
-  const usesWorkspace = questionNeedsWorkspace(question);
-  const workspaceBlock = [
-    '',
-    'WORKSPACE FILES (the user\'s live code in the Workspace panel):',
-    manifest,
-    ...(usesWorkspace ? ['', WORKSPACE_TOOL_INSTRUCTIONS, '', 'FILE CONTENTS:', workspaceContext(5000)] : [])
-  ].join('\n');
+  const usesWorkspace = !isSideHelpMode && questionNeedsWorkspace(question);
+  const workspaceBlock = isSideHelpMode
+    ? ''
+    : [
+        '',
+        'WORKSPACE FILES (the user\'s live code in the Workspace panel):',
+        workspaceManifest(),
+        ...(usesWorkspace ? ['', WORKSPACE_TOOL_INSTRUCTIONS, '', 'FILE CONTENTS:', workspaceContext(5000)] : [])
+      ].join('\n');
 
   // Tone is shared by both branches: warm and human in manner, honest in fact.
   const voice = [
@@ -998,12 +1049,18 @@ function buildMessages(question, excerpts) {
     'Do not keep announcing that you are software, but never claim to be a human being: no body, no childhood, no invented memories, no feelings stated as facts. If asked directly, say what you are in one plain sentence and carry on helping.'
   ];
 
-  const common = [
-    ...voice,
-    'For any arithmetic, write <calc>expression</calc> and the app will compute it exactly — never guess a number.',
-    'Code is welcome when it helps: a fenced block with the language name works, and the app can preview it.',
-    'To draw something, write <draw>a short description</draw> on its own line; the app turns it into real SVG. Never hand-write SVG markup yourself.'
-  ];
+  const common = isSideHelpMode
+    ? [
+        ...voice,
+        'For any arithmetic, write <calc>expression</calc> and the app will substitute the exact number inline. Never mention a calculator or say "Answered with Calculator".',
+        'Keep replies focused on clear, concise plain-text help.'
+      ]
+    : [
+        ...voice,
+        'For any arithmetic, write <calc>expression</calc> and the app will compute it — never guess a number, and never say "Answered with Calculator".',
+        'Code is welcome when it helps: a fenced block with the language name works, and the app can preview it.',
+        'To draw something, write <draw>a short description</draw> on its own line; the app turns it into real SVG. Never hand-write SVG markup yourself.'
+      ];
 
   const rules = grounded
     ? [
@@ -1028,7 +1085,7 @@ function buildMessages(question, excerpts) {
         'Plain text, at most 120 words. Use a short list only for steps or options.'
       ];
 
-  const system = [...rules, '', 'SOURCES:', sources, workspaceBlock].join('\n');
+  const system = [...rules, '', 'SOURCES:', sources, workspaceBlock].filter(Boolean).join('\n');
 
   const messages = [{ role: 'system', content: system }];
   for (const turn of history.slice(-HISTORY_TURNS)) messages.push(turn);
@@ -1072,8 +1129,8 @@ function wasAborted(error) {
   return error?.name === 'WllamaAbortError' || error?.code === 'abort' || /abort/i.test(error?.message || '');
 }
 
-async function generateAnswer(question, excerpts, onToken, abortSignal) {
-  const messages = buildMessages(question, excerpts);
+async function generateAnswer(question, excerpts, onToken, abortSignal, calculation = null) {
+  const messages = buildMessages(question, excerpts, calculation);
   try {
     return await chatCompletion(messages, onToken, abortSignal);
   } catch (error) {
@@ -1310,7 +1367,7 @@ function attachActions(body, record) {
     row.append(again);
 
     // Code in an answer can be visualised in the workspace preview.
-    const bundle = codeBundleFromText(record.text);
+    const bundle = isSideHelpMode ? null : codeBundleFromText(record.text);
     if (bundle) {
       const preview = document.createElement('button');
       preview.type = 'button';
@@ -1320,7 +1377,7 @@ function attachActions(body, record) {
       preview.addEventListener('click', () => openWorkspaceWithCode(bundle));
       row.append(preview);
     }
-    if (record.files?.length || bundle) {
+    if (!isSideHelpMode && (record.files?.length || bundle)) {
       const workspace = document.createElement('button');
       workspace.type = 'button';
       workspace.className = 'msg-action';
@@ -1470,7 +1527,7 @@ function renderChatList() {
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'chat-delete';
-    remove.textContent = '×';
+    remove.innerHTML = moxIcon('close', 'mox-ico');
     remove.title = 'Delete this chat';
     remove.setAttribute('aria-label', `Delete chat: ${chatTitle(chat)}`);
     remove.addEventListener('click', (event) => { event.stopPropagation(); deleteChat(chat.id); });
@@ -1534,12 +1591,20 @@ function updateComposer() {
   const usable = modelReady || searchOnly;
   const streaming = generating && modelReady;
   elements.input.disabled = !usable || generating;
+  if (isSideHelpMode) elements.input.placeholder = 'Ask a help question…';
   elements.form.setAttribute('aria-busy', String(streaming));
   elements.send.classList.toggle('stop', streaming);
-  elements.send.innerHTML = streaming ? '<span aria-hidden="true"></span>' : '↑';
+  elements.send.innerHTML = streaming ? '<span aria-hidden="true"></span>' : moxIcon('send', 'mox-ico');
   elements.send.setAttribute('aria-label', streaming ? 'Stop generating' : 'Send message');
   elements.send.title = streaming ? 'Stop generating' : 'Send message';
   elements.send.disabled = streaming ? false : (!usable || !elements.input.value.trim());
+  if (isSideHelpMode) {
+    if (generating) elements.hint.textContent = 'Generating reply…';
+    else if (modelReady) elements.hint.textContent = 'Text chat ready · runs on this device';
+    else if (searchOnly) elements.hint.textContent = 'Search-only mode — answers show matching help';
+    else elements.hint.textContent = 'Starting local chat…';
+    return;
+  }
   const sources = allKnowledge().length;
   if (generating) elements.hint.textContent = 'Generating on this device…';
   else if (modelReady) elements.hint.textContent = `${sources} searchable document${sources === 1 ? '' : 's'} · ${loadedModel?.parameters || 'local model'}`;
@@ -1581,12 +1646,13 @@ function stopGeneration() {
   abortController.abort();
 }
 
-// A question that is really a calculation should not depend on the model
-// guessing. "what is 1234 * 5678?" is answered by the calculator, exactly.
+// Questions that the expression engine can evaluate exactly are precomputed
+// and handed to the AI model so the model answers in natural language without
+// guessing arithmetic or printing a calculator attribution banner.
 function pureCalculation(question) {
   let expression = String(question || '').trim()
-    .replace(/^(?:what(?:'s| is)|whats|calculate|compute|evaluate|solve|convert|how much is|how many)\s+/i, '')
-    .replace(/[?=\s]+$/g, '')
+    .replace(/^(?:(?:can|could) you )?(?:please )?(?:tell me )?(?:what(?:'s| is)|whats|calculate|compute|evaluate|solve|convert|how much is)\s+/i, '')
+    .replace(/(?:\s+please)?[?=\s]+$/i, '')
     .trim();
   if (!expression || expression.length > 140) return null;
   if (!/[0-9]/.test(expression)) return null;
@@ -1597,6 +1663,33 @@ function pureCalculation(question) {
   const result = evaluateExpression(expression);
   if (!result.ok) return null;
   return { ...result, expression };
+}
+
+function formatCalculatedFallback(calculation) {
+  if (calculation.conversion && calculation.conversion !== calculation.text) {
+    return `${calculation.conversion}.`;
+  }
+  return `${calculation.expression} is **${calculation.text}**.`;
+}
+
+function answerHasCalculationValue(text, calculation) {
+  if (!calculation) return true;
+  const cleanText = String(text || '').replace(/,/g, '');
+  const targetText = String(calculation.text || '').replace(/,/g, '').trim();
+  if (targetText && cleanText.includes(targetText)) return true;
+  if (Number.isFinite(calculation.value)) {
+    const rounded = Math.round(calculation.value * 1e6) / 1e6;
+    if (cleanText.includes(String(calculation.value)) || cleanText.includes(String(rounded))) return true;
+  }
+  return false;
+}
+
+function stripCalculatorAttribution(text) {
+  return String(text || '')
+    .replace(/^\s*[-*_]*\s*(?:answered with calculator|computed by (?:the )?calculator\b[^\n]*)[*_.\s]*$/gim, '')
+    .replace(/\banswered with calculator\b[.:;,\s-]*/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /**
@@ -1640,50 +1733,37 @@ async function handleSubmit(event) {
   const userRecord = activeChat().records[activeChat().records.length - 1];
 
   const calculation = pureCalculation(question);
-  if (calculation) {
-    const body = [
-      `\`${calculation.expression}\` = **${calculation.text}**`,
-      calculation.conversion && calculation.conversion !== `${calculation.text}` ? calculation.conversion : '',
-      '',
-      '_Computed by the calculator in this browser — no model guesswork._'
-    ].filter(Boolean).join('\n');
-    const record = addRecord('assistant', body);
-    record.calculated = calculation.expression;
-    const calcBody = elements.messages.lastElementChild.querySelector('.message-body');
-    attachActions(calcBody, record);
-    announce('Answer ready.');
-    updateComposer();
-    elements.input.focus();
-    return;
-  }
 
   // A request to draw is answered by the drawing engine, not the model: a
   // 135M model cannot produce trustworthy SVG, but svg.js can produce exact
-  // shapes, charts and scenes. This also works in search-only mode.
-  if (drawingIntent(question)) {
+  // shapes, charts and scenes. Disabled in plain text-chat help mode.
+  if (!calculation && !isSideHelpMode && drawingIntent(question)) {
     askDrawing(question, { ask: false });
     return;
   }
 
-  const excerpts = retrieve(question);
+  const excerpts = calculation ? [] : retrieve(question);
   updateComposer();
 
   if (!modelReady) {
-    addRecord('assistant', fallbackAnswer(excerpts), excerpts);
+    const reply = calculation ? formatCalculatedFallback(calculation) : fallbackAnswer(excerpts);
+    const record = addRecord('assistant', reply, excerpts);
+    if (calculation) record.calculated = calculation.expression;
     updateComposer();
     elements.input.focus();
     return;
   }
-  await runGeneration(question, excerpts, userRecord);
+  await runGeneration(question, excerpts, userRecord, calculation);
 }
 
-async function runGeneration(question, excerpts, userRecord) {
+async function runGeneration(question, excerpts, userRecord, calculation = null) {
   generating = true;
   abortController = new AbortController();
   updateComposer();
   elements.typing.hidden = false;
 
   const answer = addRecord('assistant', '', excerpts);
+  if (calculation) answer.calculated = calculation.expression;
   const body = elements.messages.lastElementChild.querySelector('.message-body');
   const cursor = document.createElement('span');
   cursor.className = 'cursor-blink';
@@ -1700,25 +1780,34 @@ async function runGeneration(question, excerpts, userRecord) {
       body.textContent = streamed;
       body.append(cursor);
       scrollToBottom();
-    }, abortController.signal);
+    }, abortController.signal, calculation);
 
     cursor.remove();
-    const final = cleanupAnswer(result || streamed);
-    if (!final || final.length < 2) throw new Error('Empty response');
-    paintAnswer(answer, body, final, excerpts, started);
+    const final = stripCalculatorAttribution(cleanupAnswer(result || streamed));
+    if (!final || final.length < 2) {
+      if (calculation) {
+        paintAnswer(answer, body, formatCalculatedFallback(calculation).replace(/\*\*/g, ''), excerpts, started, { calculation });
+      } else {
+        throw new Error('Empty response');
+      }
+    } else {
+      paintAnswer(answer, body, final, excerpts, started, { calculation });
+    }
   } catch (error) {
     cursor.remove();
     if (wasAborted(error)) {
       stopped = true;
-      const partial = cleanupAnswer(streamed);
+      const partial = stripCalculatorAttribution(cleanupAnswer(streamed));
       if (partial.length > 1) {
-        paintAnswer(answer, body, `${partial} …`, excerpts, started, { apply: false });
+        paintAnswer(answer, body, `${partial} …`, excerpts, started, { apply: false, calculation });
         showToast('Stopped. The answer above is what the model had produced.');
       } else {
         body.closest('.message')?.remove();
         activeChat().records = activeChat().records.filter((record) => record !== answer);
         showToast('Stopped.');
       }
+    } else if (calculation) {
+      paintAnswer(answer, body, formatCalculatedFallback(calculation).replace(/\*\*/g, ''), excerpts, started, { calculation });
     } else {
       console.error('Inference failed:', error);
       body.closest('.message')?.remove();
@@ -1739,18 +1828,24 @@ async function runGeneration(question, excerpts, userRecord) {
   }
 }
 
-function paintAnswer(record, body, text, excerpts, started, { apply = true } = {}) {
+function paintAnswer(record, body, text, excerpts, started, { apply = true, calculation = null } = {}) {
   const seconds = Math.max(0.1, (performance.now() - started) / 1000);
-  const prepared = finalizeAnswer(text, { apply });
+  const prepared = finalizeAnswer(text, { apply: apply && !isSideHelpMode });
+  let displayText = stripCalculatorAttribution(prepared.text);
+  if (calculation && !answerHasCalculationValue(displayText, calculation)) {
+    displayText = calculation.conversion && calculation.conversion !== calculation.text
+      ? `${calculation.conversion}.`
+      : `${calculation.expression} equals ${calculation.text}.`;
+  }
   // Rough token estimate for a progress hint; exact counts are not exposed.
-  const tokens = Math.max(1, Math.round(text.length / 4));
-  record.text = prepared.text;
+  const tokens = Math.max(1, Math.round(displayText.length / 4));
+  record.text = displayText;
   record.excerpts = excerpts;
   record.files = [...new Set([...(record.files || []), ...prepared.paths])];
   record.stats = `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)}s · ${Math.round(tokens / seconds)} tok/s`;
-  paintBody(body, prepared.text);
+  paintBody(body, displayText);
   if (excerpts?.length) body.append(citationPills(excerpts, record));
-  else body.append(noSourcesNote());
+  else if (!calculation && !record.calculated) body.append(noSourcesNote());
   attachActions(body, record);
 
   const chat = activeChat();
@@ -1776,8 +1871,9 @@ async function regenerate(record) {
   elements.messages.textContent = '';
   history = chatRecordsToHistory(chat);
   for (const entry of chat.records) renderMessage(entry.role, entry.text, entry.excerpts || [], entry);
-  const excerpts = record.excerpts?.length ? record.excerpts : retrieve(question.text);
-  await runGeneration(question.text, excerpts, question);
+  const calculation = pureCalculation(question.text);
+  const excerpts = calculation ? [] : (record.excerpts?.length ? record.excerpts : retrieve(question.text));
+  await runGeneration(question.text, excerpts, question, calculation);
 }
 
 function resetChat() {
@@ -1962,12 +2058,12 @@ function unloadEngine(reason = '') {
   elements.progress.hidden = true;
   elements.load.disabled = false;
   elements.load.classList.remove('loaded');
-  elements.load.innerHTML = '<span class="button-sparkle">✳</span> Start a model';
+  elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('brand', 'mox-ico')}</span> Start a model`;
   elements.modelTitle.textContent = 'Search-only mode';
   elements.modelDescription.textContent = 'No model is loaded. Pick one in Model & settings, or upload a .gguf.';
   elements.modelSize.textContent = 'Search only';
   setModelStatus('idle', 'No model loaded');
-  setSourceBadge('remote', '◈ search only');
+  setSourceBadge('remote', 'search only');
   updateComposer();
   updateModelMenu();
   if (reason) showToast(reason);
@@ -1995,7 +2091,7 @@ async function switchModel(id) {
   // startModel refuses to run when the button is disabled or marked loaded.
   elements.load.disabled = false;
   elements.load.classList.remove('loaded');
-  elements.load.innerHTML = '<span class="button-sparkle">✳</span> Start the model';
+  elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('brand', 'mox-ico')}</span> Start the model`;
   elements.progress.hidden = false;
   elements.progressBar.style.width = '0%';
   elements.progressPercent.textContent = '0%';
@@ -2371,6 +2467,35 @@ $('#quickAsk').addEventListener('click', () => {
   elements.input.focus();
   if (!modelReady && !searchOnly) showToast('The model is still loading — one moment.');
 });
+elements.sideHelpNewChat?.addEventListener('click', resetChat);
+elements.sideHelpMenuBtn?.addEventListener('click', resetChat);
+elements.sideHelpRetry?.addEventListener('click', () => startModel());
+elements.sideHelpList?.querySelectorAll('.side-help-item').forEach((button) => {
+  button.addEventListener('click', () => {
+    const ask = button.dataset.helpAsk;
+    const fill = button.dataset.helpFill;
+    if (ask) {
+      elements.input.value = ask;
+      elements.input.style.height = 'auto';
+      updateComposer();
+      if ((modelReady || searchOnly) && !generating) elements.form.requestSubmit();
+      else {
+        elements.input.focus();
+        showToast('Starting local chat — press Enter once ready.');
+      }
+      return;
+    }
+    if (fill != null) {
+      elements.input.value = fill;
+      elements.input.style.height = 'auto';
+      elements.input.style.height = `${Math.min(elements.input.scrollHeight, 132)}px`;
+      updateComposer();
+      elements.input.focus();
+      const end = elements.input.value.length;
+      elements.input.setSelectionRange?.(end, end);
+    }
+  });
+});
 elements.libraryToggle.addEventListener('change', async () => {
   libraryEnabled = elements.libraryToggle.checked;
   await writeMeta('libraryEnabled', libraryEnabled);
@@ -2388,11 +2513,11 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     elements.input.focus();
   }
-  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'j') {
+  if (!isSideHelpMode && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'j') {
     event.preventDefault();
     openCalculator();
   }
-  if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'e') {
+  if (!isSideHelpMode && (event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'e') {
     event.preventDefault();
     openWorkspace();
   }
@@ -2408,7 +2533,7 @@ document.addEventListener('keydown', (event) => {
 // Drop files anywhere on the composer area to add them to this chat.
 ['dragenter', 'dragover'].forEach((type) => {
   elements.form.addEventListener(type, (event) => {
-    if (!event.dataTransfer?.types?.includes('Files')) return;
+    if (isSideHelpMode || !event.dataTransfer?.types?.includes('Files')) return;
     event.preventDefault();
     elements.form.classList.add('dragging');
   });
@@ -2417,6 +2542,7 @@ document.addEventListener('keydown', (event) => {
   elements.form.addEventListener(type, () => elements.form.classList.remove('dragging'));
 });
 elements.form.addEventListener('drop', (event) => {
+  if (isSideHelpMode) return;
   const files = event.dataTransfer?.files;
   if (!files?.length) return;
   event.preventDefault();
@@ -2425,6 +2551,7 @@ elements.form.addEventListener('drop', (event) => {
 
 // Paste a PDF or note straight into the composer.
 document.addEventListener('paste', (event) => {
+  if (isSideHelpMode) return;
   const files = [...(event.clipboardData?.files || [])];
   if (files.length) importFiles(files);
 });
@@ -2469,11 +2596,11 @@ async function loadModelFile(file) {
     elements.modelTitle.textContent = 'Mox is ready';
     elements.modelDescription.textContent = `${file.name} is running in this browser.`;
     elements.modelSize.textContent = displaySize(file.size);
-    elements.load.innerHTML = '<span class="button-sparkle">✓</span> Model loaded';
+    elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('check', 'mox-ico')}</span> Model loaded`;
     elements.load.classList.add('loaded');
     elements.load.disabled = true;
     setModelStatus('ready', `${loadedModel.name} ready`);
-    setSourceBadge('local', '◈ your model');
+    setSourceBadge('local', 'your model');
     updateModelMenu();
     updateComposer();
     showToast(`${file.name} loaded. Ask away.`);
@@ -2494,7 +2621,7 @@ async function loadModelFile(file) {
     elements.modelDescription.textContent = 'Browsers block WebAssembly and module loading from file:// URLs. Open the published Mox page, or run `python3 run.py` in the project folder and use the address it prints.';
     elements.progress.hidden = true;
     elements.load.disabled = true;
-    elements.load.innerHTML = '<span class="button-sparkle">⚠</span> Needs a web address';
+    elements.load.innerHTML = `<span class="button-sparkle">${moxIcon('alert', 'mox-ico')}</span> Needs a web address`;
     setModelStatus('error', 'Open this page over http(s)');
     showToast('Open the published page, or run `python3 run.py` and use the printed address.');
     return;
@@ -2523,15 +2650,20 @@ async function loadModelFile(file) {
     if (Array.isArray(savedHidden)) hiddenModels = savedHidden.filter((id) => typeof id === 'string');
     renderSources();
     if (await restoreChats()) {
-      renderChatList();
-      if (activeChatId) openConversation(activeChatId);
+      if (isSideHelpMode) {
+        activeChatId = null;
+        renderChatList();
+      } else {
+        renderChatList();
+        if (activeChatId) openConversation(activeChatId);
+      }
     }
   } catch (error) {
     console.error('Could not open local workspace:', error);
     showToast('Local browser storage is unavailable. Try a recent version of Chrome, Edge, or Firefox.');
   }
   updateComposer();
-  setSourceBadge('', '◈ reading model manifest…');
+  setSourceBadge('', 'reading model manifest…');
   await readModelManifest();
   const model = activeModel();
   if (model) {
@@ -2540,9 +2672,9 @@ async function loadModelFile(file) {
     elements.modelSize.textContent = displaySize(model.bytes);
     const menuSub = document.querySelector('.model-menu-sub');
     if (menuSub && model.parameters) menuSub.textContent = model.parameters;
-    setSourceBadge('local', '◈ model on this site');
+    setSourceBadge('local', 'model on this site');
   } else {
-    setSourceBadge('remote', '◈ no model file');
+    setSourceBadge('remote', 'no model file');
   }
   // A reload with no connection still works: the service worker keeps a copy of
 // the shell. Browsers only allow this on https or localhost.

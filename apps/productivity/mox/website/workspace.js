@@ -10,6 +10,8 @@
 // This module knows nothing about wllama. app.js hands it a `complete()` hook
 // that runs the loaded model.
 
+import { moxIcon } from './svg.js';
+
 const DB_NAME = 'mox-workspace';
 const DB_VERSION = 1;
 const SNAPSHOT_KEY = 'snapshot';
@@ -209,7 +211,7 @@ function renderFileList() {
         <span class="ws-file-icon">${iconFor(file.path)}</span>
         <span class="ws-file-name" title="${escapeHTML(file.path)} · double-click to rename">${escapeHTML(file.path)}</span>
       </button>
-      <button type="button" class="ws-file-remove" title="Delete ${escapeHTML(file.path)}" aria-label="Delete ${escapeHTML(file.path)}">×</button>`;
+      <button type="button" class="ws-file-remove" title="Delete ${escapeHTML(file.path)}" aria-label="Delete ${escapeHTML(file.path)}">${moxIcon('close', 'mox-ico')}</button>`;
     row.querySelector('.ws-file-open').addEventListener('click', () => openFile(file.path));
     row.querySelector('.ws-file-open').addEventListener('dblclick', () => renameFile(file.path));
     row.querySelector('.ws-file-remove').addEventListener('click', (event) => {
@@ -221,12 +223,12 @@ function renderFileList() {
 }
 
 function iconFor(path) {
-  if (/\.html?$/i.test(path)) return '⟨⟩';
-  if (/\.css$/i.test(path)) return '#'; 
-  if (/\.m?js$/i.test(path)) return '⌁';
-  if (/\.svg$/i.test(path)) return '◇';
-  if (/\.json$/i.test(path)) return '{}';
-  return '▤';
+  if (/\.html?$/i.test(path)) return moxIcon('code', 'mox-ico');
+  if (/\.css$/i.test(path)) return moxIcon('css', 'mox-ico');
+  if (/\.m?js$/i.test(path)) return moxIcon('js', 'mox-ico');
+  if (/\.svg$/i.test(path)) return moxIcon('svg', 'mox-ico');
+  if (/\.json$/i.test(path)) return moxIcon('json', 'mox-ico');
+  return moxIcon('file', 'mox-ico');
 }
 
 function renderTabs() {
