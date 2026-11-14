@@ -113,11 +113,11 @@ const STORE_CATALOG = [
   { id: 'solitaire', name: 'Solitaire!', seller: 'Retro Bits Co.', price: 0, hue: 200, glyph: '♠', desc: 'The undisputed king of meeting-sized focus.', category: 'Cards', rating: 4.5, ratings: '1.2M' },
   { id: 'stacks', name: 'Stack the Blocks', seller: 'Physics Pals', price: 0.99, hue: 130, glyph: '▣', desc: 'A Tetris-adjacent physics puzzler that apologizes for nothing.', category: 'Puzzle', rating: 4, ratings: '84K' },
   { id: 'moonbase', name: 'Moon Base Alpha', seller: 'Dome Labs', price: 1.99, hue: 220, glyph: '☾', desc: 'Build a lunar colony, negotiate with a sentient airlock.', category: 'Strategy', rating: 5, ratings: '31K' },
-  { id: 'pixelracer', name: 'Pixel Racer Turbo', seller: 'Apex Pixel Works', price: 0, hue: 0, glyph: '🏎', desc: 'Low-poly lightning. Procedural synthwave included free.', category: 'Racing', rating: 4.5, ratings: '402K' },
+  { id: 'pixelracer', name: 'Pixel Racer Turbo', seller: 'Apex Pixel Works', price: 0, hue: 0, glyph: '⚑', desc: 'Low-poly lightning. Procedural synthwave included free.', category: 'Racing', rating: 4.5, ratings: '402K' },
   { id: 'wordvault', name: 'Word Vault', seller: 'Lexicon Labs', price: 0.99, hue: 48, glyph: 'A', desc: 'Crack lexical combinations under pressure. Boggle but polite.', category: 'Word', rating: 4, ratings: '19K' },
   { id: 'starfarmer', name: 'Star Farmer 3000', seller: 'Andromeda Agronomy', price: 2.99, hue: 96, glyph: '✷', desc: 'Grow zero-G wheat on Ceres. Water sparingly. Regret nothing.', category: 'Simulation', rating: 4.5, ratings: '57K' },
   { id: 'dungeonnote', name: 'Dungeon Note', seller: 'Graphite Guild', price: 0, hue: 280, glyph: '✎', desc: 'A grid-paper dungeon mapper for the adventurer who takes notes.', category: 'Utilities', rating: 4, ratings: '12K' },
-  { id: 'radiofm', name: 'Radio FM Paradise', seller: 'Airwaves Inc.', price: 0, hue: 340, glyph: '📻', desc: 'Hand-tuned internet radio: surf 30 stations from 1997.', category: 'Music', rating: 4.5, ratings: '233K' }
+  { id: 'radiofm', name: 'Radio FM Paradise', seller: 'Airwaves Inc.', price: 0, hue: 340, glyph: '♪', desc: 'Hand-tuned internet radio: surf 30 stations from 1997.', category: 'Music', rating: 4.5, ratings: '233K' }
 ];
 
 registerApp('appstore', (() => {
@@ -227,7 +227,7 @@ const GC_ACHIEVEMENTS = [
   { id: 'gc-points', title: 'Point Collector', desc: 'Accumulate 200 total achievement points.', points: 30, tier: 1 },
   { id: 'gc-veteran', title: 'OldOS Veteran', desc: 'Accumulate 250 total achievement points.', points: 100, tier: 3 }
 ];
-const MEMORY_GLYPHS = ['🍎','🍊','🍋','🍇','🍉','🍒','🥝','🍍'];
+const MEMORY_GLYPHS = ['♥','♠','♦','♣','★','☾','♪','✿'];
 
 registerApp('gamecenter', (() => {
   const GC_DEFAULT = { points: 0, earned: [], caroWins: 0, caroLosses: 0, caroDraws: 0, memoryBest: null, snakeBest: 0, matches: 0 };

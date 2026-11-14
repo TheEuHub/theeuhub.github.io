@@ -350,7 +350,7 @@ window.OldOS = (function () {
   const folderHTML = f => {
     const minis = f.apps.slice(0, 9).map(a => {
       const app = APPS[a];
-      const small = app ? 'assets/icons/small/' + app.name.replace(/ /g, '-') + '-Small.png' : '';
+      const small = app ? 'assets/icons/small/' + encodeURI(app.name + '-Small.png') : '';
       return '<img src="' + (small || app.icon) + '" alt="" onerror="this.onerror=null;this.src=&quot;' + app.icon + '&quot;">';
     }).join('');
     return '<button class="icon folder-icon" data-folder="' + esc(f.id) + '" style="--d:0.05s" aria-label="' + esc(f.name) + ' folder">'
@@ -472,6 +472,7 @@ window.OldOS = (function () {
     };
     vp.addEventListener('pointerup', endDrag);
     vp.addEventListener('pointercancel', endDrag);
+    goPage(1);   /* land on the icon grid, not the Spotlight void */
   };
   let lastDragAt = 0;
   const wasSwipe = () => Date.now() - lastDragAt < 180;

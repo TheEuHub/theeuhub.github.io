@@ -31,7 +31,7 @@ registerApp('messages', (() => {
   const save = m => { store.set('messages', m); OldOS.refreshBadges(); };
 
   const BOT = [
-    ['hello|hi|hey', ['Hey! 👋 (ding)', 'Well hello there.', 'Hi hi hi.']],
+    ['hello|hi|hey', ['Hey! (·‿·)', 'Well hello there.', 'Hi hi hi.']],
     ['os|ios|old ?os', ['OldOS 2.0, baby. Rebuilt for the web.', 'It’s the water droplets that make it.', 'Slide to unlock. That’s the whole review.']],
     ['time', ['It’s ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' — right on schedule.', 'Time flies when you’re reliving 2010.']],
     ['weather', ['Supposedly 84° and sunny. Check the Weather app before you leave.', 'If you’re indoors coding, it’s 72° and fluorescent.']],

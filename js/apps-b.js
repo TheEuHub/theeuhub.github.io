@@ -232,9 +232,9 @@ registerApp('mail', (() => {
     const unread = unreadCount();
     return '<div class="app-scroll pinstripe">'
       + '<div class="group-list">'
-      + '<button class="row tappable" data-box="inbox"><span style="font-size:18px">📥</span><span class="row-label" style="font-weight:600">Inbox</span>' + (unread ? '<span class="row-value"><span style="background:#1c64f2;color:#fff;border-radius:10px;min-width:21px;height:20px;padding:0 6px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">' + unread + '</span></span>' : '') + '<span class="row-chev">›</span></button>'
-      + '<button class="row tappable" data-box="sent"><span style="font-size:18px">📤</span><span class="row-label" style="font-weight:600">Sent</span><span class="row-value">' + load().sent.length + '</span><span class="row-chev">›</span></button>'
-      + '<button class="row tappable" data-box="trash"><span style="font-size:18px">🗑️</span><span class="row-label" style="font-weight:600">Trash</span><span class="row-value">' + load().trash.length + '</span><span class="row-chev">›</span></button>'
+      + '<button class="row tappable" data-box="inbox"><span style="font-size:18px">▼</span><span class="row-label" style="font-weight:600">Inbox</span>' + (unread ? '<span class="row-value"><span style="background:#1c64f2;color:#fff;border-radius:10px;min-width:21px;height:20px;padding:0 6px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">' + unread + '</span></span>' : '') + '<span class="row-chev">›</span></button>'
+      + '<button class="row tappable" data-box="sent"><span style="font-size:18px">▲</span><span class="row-label" style="font-weight:600">Sent</span><span class="row-value">' + load().sent.length + '</span><span class="row-chev">›</span></button>'
+      + '<button class="row tappable" data-box="trash"><span style="font-size:18px">✕</span><span class="row-label" style="font-weight:600">Trash</span><span class="row-value">' + load().trash.length + '</span><span class="row-chev">›</span></button>'
       + '</div>'
       + '<div class="group-list"><button class="row center" data-action="check" id="checkMailBtn">Check for Mail</button></div>'
       + '<p class="center-note">Mailbox syncs locally. Nobody’s snooping — it’s 2010 privacy retro.</p>'
