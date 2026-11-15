@@ -795,6 +795,29 @@ function setSourceBadge(kind, text) {
   elements.sourceBadge.innerHTML = `${moxIcon('chip', 'mox-ico')}<span>${escapeHTML(text)}</span>`;
 }
 
+async function probeLocalAsset(url) {
+  try {
+    const head = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (head.ok) return true;
+    if (head.status === 404 || head.status === 410) return false;
+  } catch { /* fall through to Range GET probe when HEAD is blocked */ }
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  try {
+    const probe = await fetch(url, {
+      headers: { Range: 'bytes=0-0' },
+      cache: 'no-store',
+      ...(controller ? { signal: controller.signal } : {})
+    });
+    const ok = probe.ok || probe.status === 206;
+    try { await probe.body?.cancel?.(); } catch {}
+    try { controller?.abort(); } catch {}
+    return ok;
+  } catch {
+    try { controller?.abort(); } catch {}
+    return false;
+  }
+}
+
 async function readModelManifest() {
   let base = { version: 1, default: null, models: [] };
   try {
@@ -808,15 +831,9 @@ async function readModelManifest() {
   // Bundled/served models are listed only if the file is actually reachable.
   const available = [];
   for (const entry of base.models || []) {
-    try {
-      const head = await fetch(`models/${entry.file}`, { method: 'HEAD', cache: 'no-store' });
-      if (head.ok) {
-        available.push(entry);
-      } else if (head.status === 405) {
-        const probe = await fetch(`models/${entry.file}`, { headers: { Range: 'bytes=0-0' }, cache: 'no-store' });
-        if (probe.ok || probe.status === 206) available.push(entry);
-      }
-    } catch { /* ignore missing files */ }
+    if (await probeLocalAsset(`models/${entry.file}`)) {
+      available.push(entry);
+    }
   }
 
   // Models the user uploaded earlier live in IndexedDB and are always offered.
@@ -869,10 +886,10 @@ function isSupportTable64() {
 }
 
 function isSupportNativeWllama() {
-  if (typeof WebAssembly === 'undefined' || !WebAssembly.Suspending) return false;
+  if (typeof WebAssembly === 'undefined' || !WebAssembly.Suspending || !WebAssembly.promising) return false;
   if (!isSupportTable64()) return false;
   try {
-    new WebAssembly.Memory({ address: 'i64', initial: 1n });
+    new WebAssembly.Memory({ address: 'i64', initial: 1n, shared: true });
     return true;
   } catch {
     return false;
@@ -882,17 +899,9 @@ function isSupportNativeWllama() {
 // Older browsers without JSPI, Memory64, or Table64 need wllama's compatibility build.
 // Use the vendored files in vendor/wllama/compat/ so nothing is fetched from a CDN.
 async function vendoredCompat() {
-  try {
-    const head = await fetch(WLLAMA_COMPAT_WASM, { method: 'HEAD' });
-    if (head.ok) return { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM };
-    if (head.status === 405) {
-      const probe = await fetch(WLLAMA_COMPAT_WASM, { headers: { Range: 'bytes=0-0' } });
-      if (probe.ok || probe.status === 206) return { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  return (await probeLocalAsset(WLLAMA_COMPAT_WASM))
+    ? { worker: WLLAMA_COMPAT_JS, wasm: WLLAMA_COMPAT_WASM }
+    : null;
 }
 
 const NOOP_CACHE = {
@@ -927,9 +936,10 @@ async function createEngine({ forceCompat = false, compat = undefined, onWorkerE
     }
   };
 
+  const hasOpfs = Boolean(typeof navigator !== 'undefined' && navigator.storage?.getDirectory);
   let instance;
   try {
-    instance = new Wllama(config, options);
+    instance = new Wllama(config, hasOpfs ? options : { ...options, cacheManager: NOOP_CACHE });
   } catch (error) {
     // Some browsers block the storage backend (private mode, older Safari).
     // A no-op cache keeps the engine usable: the model streams from this site.
@@ -946,6 +956,9 @@ async function createEngine({ forceCompat = false, compat = undefined, onWorkerE
         compat: true
       });
     }
+  } else {
+    // Never fall back to external CDNs if local compat files are unavailable.
+    instance.setCompat?.(null, 'firefox_safari');
   }
   return { instance, useCompat };
 }
@@ -979,11 +992,20 @@ async function loadModelWithFallbacks(blobs, { onAttempt } = {}) {
     attempts.push({ ...plan, forceCompat: effectiveCompat, n_gpu_layers: effectiveGpu });
   }
 
+  const totalBytes = blobs.reduce((sum, item) => sum + (item?.size || 0), 0);
+  const attemptTimeoutMs = Math.max(30000, Math.min(180000, 30000 + Math.round(totalBytes / (5 * 1024 * 1024)) * 1000));
+
   let lastError = null;
   for (const plan of attempts) {
     onAttempt?.(plan);
     let rejectWorker;
     const workerErrorPromise = new Promise((_, reject) => { rejectWorker = reject; });
+    let timeoutId = null;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`Model initialization timed out after ${Math.round(attemptTimeoutMs / 1000)}s`));
+      }, attemptTimeoutMs);
+    });
     let candidate = null;
     let useCompat = plan.forceCompat;
     try {
@@ -1004,7 +1026,8 @@ async function loadModelWithFallbacks(blobs, { onAttempt } = {}) {
       if (plan.n_gpu_layers !== undefined) loadOptions.n_gpu_layers = plan.n_gpu_layers;
       await Promise.race([
         candidate.loadModel(blobs, loadOptions),
-        workerErrorPromise
+        workerErrorPromise,
+        timeoutPromise
       ]);
       engine = candidate;
       return { engine: candidate, threadsUsed: plan.n_threads, ctxUsed: plan.n_ctx, compatUsed: useCompat };
@@ -1014,6 +1037,8 @@ async function loadModelWithFallbacks(blobs, { onAttempt } = {}) {
       if (candidate) {
         try { await candidate.exit?.(); } catch {}
       }
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
     }
   }
   throw lastError || new Error('Model failed to load');
@@ -2812,11 +2837,13 @@ async function loadModelFile(file) {
   } else {
     setSourceBadge('remote', 'no model file');
   }
-  // A reload with no connection still works: the service worker keeps a copy of
-// the shell. Browsers only allow this on https or localhost.
+  // A reload with no connection still works if a service worker ships alongside.
+  // Browsers only allow service workers on https or localhost, and skip when ?nosw.
 if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.search.includes('nosw')) {
-  const registerWorker = () => {
-    navigator.serviceWorker.register(new URL('sw.js', import.meta.url).href, { scope: './' })
+  const registerWorker = async () => {
+    const swUrl = new URL('sw.js', import.meta.url).href;
+    if (!(await probeLocalAsset(swUrl))) return;
+    navigator.serviceWorker.register(swUrl, { scope: './' })
       .catch((error) => console.warn('Offline support unavailable:', error));
   };
   if (document.readyState === 'complete') registerWorker();

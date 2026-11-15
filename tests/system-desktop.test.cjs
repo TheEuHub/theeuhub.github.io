@@ -3569,3 +3569,51 @@ test('Mari0 switches active portal color on Q and shoots it on left or right cli
   assert.match(indexHtml, /Switch Color: Q/);
 });
 
+test('Proton HTML loader bounds concurrent XHR fetches so single-threaded servers do not drop sockets', async () => {
+  const loaderSrc = source('assets/html-loader.js');
+  assert.match(loaderSrc, /Math\.min\(6,\s*eager\.length/, 'loadHtmlModules should bound concurrent app fetches');
+
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost/index.html',
+    runScripts: 'dangerously'
+  });
+  const w = dom.window;
+  let active = 0;
+  let maxActive = 0;
+  const catalogEntries = Array.from({ length: 18 }, (_, i) => ({
+    id: `app-${i}`,
+    path: `apps/test/app-${i}/app.html`,
+    streamed: 'false'
+  }));
+
+  w.APPS = {};
+  w.PROTON_APPLICATIONS = catalogEntries;
+  w.PROTON_WEBSITES = [];
+  w.registerApp = (def) => {
+    const e = w.__protonPendingApp;
+    w.APPS[e.id] = { ...e, ...def };
+  };
+  w.registerSite = () => {};
+  w.XMLHttpRequest = class {
+    open(method, url) { this.url = url; }
+    send() {
+      active++;
+      if (active > maxActive) maxActive = active;
+      setTimeout(() => {
+        active--;
+        const id = this.url.match(/app-(\d+)/)[1];
+        this.status = 200;
+        this.responseText = `<script data-proton-app>registerApp({ render() {} });</script><!-- ${id} -->`;
+        this.onload?.();
+      }, 5);
+    }
+  };
+  vm.runInContext(loaderSrc, dom.getInternalVMContext(), { filename: 'assets/html-loader.js' });
+  await w.eval('loadHtmlModules()');
+  assert.equal(Object.keys(w.APPS).length, 18, 'all eager apps should register');
+  assert.ok(maxActive <= 6, `expected <= 6 concurrent XHRs, saw ${maxActive}`);
+  dom.window.close();
+});
+

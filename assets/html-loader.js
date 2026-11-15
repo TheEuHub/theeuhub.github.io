@@ -76,9 +76,18 @@ async function loadHtmlModules() {
   if (!appEntries.length) throw new Error('Application catalog is empty — add [application] blocks to data/applications.js');
   const siteEntries = Array.isArray(window.PROTON_WEBSITES) ? window.PROTON_WEBSITES : [];
 
-  /* Fetch local apps in parallel, then register everything in catalog order. */
+  /* Fetch local apps with bounded concurrency so single-threaded servers like
+   * `python3 -m http.server` do not drop sockets on boot, then register in catalog order. */
   const eager = appEntries.filter((e) => e.streamed !== 'true');
-  const texts = await Promise.all(eager.map((e) => fetchText(e.path)));
+  const texts = new Array(eager.length);
+  let nextIdx = 0;
+  const concurrency = Math.min(6, eager.length || 1);
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (nextIdx < eager.length) {
+      const idx = nextIdx++;
+      texts[idx] = await fetchText(eager[idx].path);
+    }
+  }));
   const byId = new Map(eager.map((e, i) => [e.id, texts[i]]));
   for (const entry of appEntries) {
     if (entry.streamed === 'true') registerLazyGame(entry);

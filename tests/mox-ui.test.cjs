@@ -448,3 +448,213 @@ test('Vendored wllama + wllama-compat runtime loads bundled SmolLM2 GGUF and gen
     }
   }
 });
+
+test('wllama runtime rejects cleanly on non-string signal.abort, worker.onerror, and single-thread memory step-down', async () => {
+  const { MessageChannel: NodeMessageChannel } = require('node:worker_threads');
+  const wllamaSrc = fs.readFileSync(path.join(MOX, 'vendor/wllama/wllama.js'), 'utf8');
+  assert.ok(wllamaSrc.includes('wasmMemory: getWasmMemory()'), 'single-thread mode should also use getWasmMemory() step-down');
+  assert.ok(wllamaSrc.includes('while (maxBytes >= minBytes)'), 'getWasmMemory() should include the 128 MB step');
+  assert.ok(wllamaSrc.includes("self.addEventListener('unhandledrejection'"), 'worker should forward async createWasm/pthread rejections');
+  assert.ok(wllamaSrc.includes('this.worker.onmessageerror='), 'ProxyToWorker should hook onmessageerror');
+
+  const savedGlobals = {};
+  const setGlobal = (key, val) => {
+    savedGlobals[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value: val, configurable: true, writable: true });
+  };
+  try {
+    setGlobal('self', globalThis);
+    setGlobal('location', { href: 'http://localhost/' });
+    setGlobal('navigator', { userAgent: 'Mozilla/5.0', hardwareConcurrency: 2 });
+    setGlobal('MessageChannel', NodeMessageChannel);
+    setGlobal('URL', class extends URL {});
+    globalThis.URL.createObjectURL = () => 'blob:mock/err';
+    globalThis.URL.revokeObjectURL = () => {};
+    setGlobal('fetch', async () => new Response('var Module={};', { status: 200 }));
+
+    const NOOP_CACHE = {
+      match: async () => null, put: async () => {}, getSize: async () => -1,
+      list: async () => [], delete: async () => {}, getNameFromURL: async (u) => String(u)
+    };
+    const { Wllama } = await import(`${path.join(MOX, 'vendor/wllama/wllama.js')}?t=err`);
+
+    setGlobal('Worker', class {
+      constructor() {
+        setTimeout(() => {
+          this.onmessage?.({ data: { verb: 'signal.abort', args: ['abort', { message: 'bad wasm binary' }, undefined, null] } });
+        }, 10);
+      }
+      postMessage() {}
+      terminate() {}
+    });
+    const w1 = new Wllama({ default: 'http://localhost/w.wasm' }, {
+      suppressNativeLog: true, cacheManager: NOOP_CACHE, logger: { debug() {}, log() {}, warn() {}, error() {} }
+    });
+    w1.setCompat({ worker: 'http://localhost/c.js', wasm: 'http://localhost/c.wasm' }, 'firefox_safari');
+    await assert.rejects(
+      () => w1.loadModel([new Blob(['gguf'])], { n_threads: 1, n_gpu_layers: 0 }),
+      /bad wasm binary/
+    );
+
+    setGlobal('Worker', class {
+      constructor() {
+        setTimeout(() => { this.onerror?.({ message: 'Worker script error' }); }, 10);
+      }
+      postMessage() {}
+      terminate() {}
+    });
+    const w2 = new Wllama({ default: 'http://localhost/w.wasm' }, {
+      suppressNativeLog: true, cacheManager: NOOP_CACHE, logger: { debug() {}, log() {}, warn() {}, error() {} }
+    });
+    w2.setCompat({ worker: 'http://localhost/c.js', wasm: 'http://localhost/c.wasm' }, 'firefox_safari');
+    await assert.rejects(
+      () => w2.loadModel([new Blob(['gguf'])], { n_threads: 1, n_gpu_layers: 0 }),
+      /Worker script error/
+    );
+  } finally {
+    for (const [k, desc] of Object.entries(savedGlobals)) {
+      if (desc) Object.defineProperty(globalThis, k, desc);
+      else delete globalThis[k];
+    }
+  }
+});
+
+test('Mox handles 501 HEAD, non-Range 200 stream abort, partial JSPI, missing sw.js, and worker fallback without hanging', async () => {
+  const http = require('node:http');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mox-server-compat-'));
+  const html = fs.readFileSync(path.join(MOX, 'index.html'), 'utf8');
+  const savedGlobals = {};
+  const setGlobal = (key, val) => {
+    savedGlobals[key] = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value: val, configurable: true, writable: true });
+  };
+
+  let headReqs = 0;
+  let rangeProbeRequests = 0;
+  let abortedFullProbe = false;
+  let swRegistered = false;
+  const externalUrls = [];
+
+  const srv = http.createServer((req, res) => {
+    const clean = (req.url || '/').split('?')[0];
+    if (req.method === 'HEAD') {
+      headReqs++;
+      res.writeHead(501);
+      res.end();
+      return;
+    }
+    if (clean === '/models/manifest.json') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        version: 1,
+        default: 'tiny',
+        models: [{ id: 'tiny', name: 'Tiny', file: 'tiny.gguf', bytes: 1024, context: 2048 }]
+      }));
+      return;
+    }
+    if (clean === '/knowledge/index.json') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ version: 1, generated: '2026-11-14', categories: [], documents: [] }));
+      return;
+    }
+    if (clean === '/models/tiny.gguf' || clean === '/vendor/wllama/compat/wllama.wasm') {
+      if (req.headers.range) {
+        // Simulate server ignoring Range: bytes=0-0 and sending a slow large 200 stream
+        const totalSize = 512 * 1024;
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': String(totalSize) });
+        rangeProbeRequests++;
+        let sent = 0;
+        const timer = setInterval(() => {
+          if (res.destroyed || res.closed) { clearInterval(timer); return; }
+          res.write(Buffer.alloc(16384, 0x41));
+          sent += 16384;
+          if (sent >= totalSize) { clearInterval(timer); res.end(); }
+        }, 5);
+        res.on('close', () => { clearInterval(timer); if (sent < totalSize) abortedFullProbe = true; });
+      } else {
+        const body = Buffer.from('GGUF_DATA');
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': String(body.length) });
+        res.end(body);
+      }
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    for (const file of ['calculator.js', 'model-store.js', 'svg.js', 'workspace.js']) {
+      fs.copyFileSync(path.join(MOX, file), path.join(tmpDir, file));
+    }
+    fs.mkdirSync(path.join(tmpDir, 'vendor/wllama/compat'), { recursive: true });
+    // First Wllama attempt fails, second succeeds (simulates fallback without hanging)
+    fs.writeFileSync(path.join(tmpDir, 'vendor/wllama/wllama.js'), `
+      let calls = 0;
+      export class Wllama {
+        setCompat(c) { this._compat = c; }
+        async loadModel() {
+          calls++;
+          if (calls === 1) throw new Error('Attempt 1 stalled');
+          return true;
+        }
+        async createChatCompletion() { return { choices: [{ message: { content: 'ok' } }] }; }
+        async exit() {}
+      }
+    `);
+    fs.writeFileSync(path.join(tmpDir, 'app.js'), fs.readFileSync(path.join(MOX, 'app.js'), 'utf8'));
+
+    const dom = new JSDOM(html, {
+      url: `${baseUrl}/index.html`,
+      beforeParse(win) {
+        // Partial JSPI (Suspending without promising) must not select native WASM
+        win.WebAssembly.Suspending = (fn) => fn;
+        delete win.WebAssembly.promising;
+        Object.defineProperty(win.navigator, 'serviceWorker', {
+          value: { register: async () => { swRegistered = true; return {}; } },
+          configurable: true
+        });
+      }
+    });
+    for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'Event', 'KeyboardEvent',
+      'CustomEvent', 'MutationObserver', 'DOMParser', 'localStorage', 'AbortController', 'navigator', 'location']) {
+      setGlobal(key, dom.window[key]);
+    }
+    setGlobal('requestAnimationFrame', (fn) => setTimeout(fn, 0));
+    const nativeFetch = globalThis.fetch;
+    const tmpFilePrefix = `file://${tmpDir}`;
+    setGlobal('fetch', (u, o) => {
+      let target = typeof u === 'string' ? new URL(u, `${baseUrl}/index.html`).href : String(u?.url || u);
+      if (target.startsWith(tmpFilePrefix)) target = `${baseUrl}${target.slice(tmpFilePrefix.length)}`;
+      if (!target.startsWith(baseUrl)) externalUrls.push(target);
+      return nativeFetch(target, o);
+    });
+
+    await import(`${path.join(tmpDir, 'app.js')}?srv=${Date.now()}`);
+    const t0 = Date.now();
+    while (Date.now() - t0 < 3000) {
+      const cur = dom.window.__mox?.state();
+      if (cur?.modelReady || cur?.searchOnly) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+
+    const st = dom.window.__mox.state();
+    assert.equal(st.modelReady, true, 'model should finish via fallback despite 501 HEAD');
+    assert.deepEqual(st.availableModels, ['tiny']);
+    assert.ok(headReqs >= 2, 'HEAD probes were attempted');
+    assert.ok(rangeProbeRequests >= 2, 'Range fallback probes ran on 501 HEAD');
+    assert.equal(abortedFullProbe, true, 'non-Range 200 probe stream must be aborted immediately');
+    assert.equal(swRegistered, false, 'missing sw.js must be skipped without calling serviceWorker.register');
+    assert.deepEqual(externalUrls, [], 'must not contact any external CDN');
+  } finally {
+    srv.close();
+    for (const [k, desc] of Object.entries(savedGlobals)) {
+      if (desc) Object.defineProperty(globalThis, k, desc);
+      else delete globalThis[k];
+    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
