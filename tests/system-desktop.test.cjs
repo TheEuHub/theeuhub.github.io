@@ -3593,6 +3593,12 @@ test('Mari0 is self-contained in index.html, switches/indicates portal color, an
   const gameLua = readZipEntry(dataBuf, 'game.lua');
   const mainLua = readZipEntry(dataBuf, 'main.lua');
   const menuLua = readZipEntry(dataBuf, 'menu.lua');
+  const variablesLua = readZipEntry(dataBuf, 'variables.lua');
+
+  assert.match(variablesLua, /pausemenuoptions\s*=\s*\{"resume",\s*"suspend",\s*"volume",\s*"quit to"\}/);
+  assert.match(variablesLua, /pausemenuoptions2\s*=\s*\{"",\s*"",\s*"",\s*"menu"\}/);
+  assert.equal(/desktopprompt/.test(gameLua), false, 'pause menu must not offer quit to desktop');
+  assert.equal(/"desktop"/.test(gameLua), false, 'pause menu key handler must not reference desktop option');
 
   assert.match(marioLua, /\bself\.selectedportal\s*=\s*1\b/);
   assert.match(marioLua, /function mario:updateangle\(mx,\s*my\)/);

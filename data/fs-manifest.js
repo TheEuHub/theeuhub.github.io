@@ -1576,7 +1576,7 @@ window.PROTON_FS_MANIFEST = [
   { p: 'apps/games/mari0/CREDITS.txt', s: 265 },
   { p: 'apps/games/mari0/LOVEJS-LICENSE.txt', s: 1082 },
   { p: 'apps/games/mari0/app.html', s: 1674 },
-  { p: 'apps/games/mari0/index.html', s: 11606076 },
+  { p: 'apps/games/mari0/index.html', s: 11605928 },
   { p: 'apps/games/minesweeper/app.html', s: 1704 },
   { p: 'apps/games/minesweeper/icon.png', s: 36278 },
   { p: 'apps/games/minesweeper/index.html', s: 1233879 },
