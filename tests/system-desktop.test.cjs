@@ -372,8 +372,7 @@ test('every catalog entry points at a real, syntactically valid app module', () 
     ['apps/games/grey-box-testing/greyboxtesting.zip-chunk0.js', 20000000],
     ['apps/games/tunnel-rush/tunnelrush.zip-chunk0.js', 15000000],
     ['apps/tools/ruffle-flash-player/dd0be85ee9c2092132d1.wasm.js', 15000000],
-    ['apps/games/mari0/love.wasm', 4000000],
-    ['apps/games/mari0/game.data', 3000000],
+    ['apps/games/mari0/index.html', 8000000],
     ['apps/games/sm64/sm64.us.f3dex2e.wasm', 15000000],
     ['apps/games/sm64/sm64.us.f3dex2e.js', 200000],
     ['apps/games/bitlife/Build/BitLife.data.unityweb', 14000000],
@@ -3514,26 +3513,54 @@ test('the AI button docks Mox beside the desktop, like Copilot on Windows', asyn
   } finally { close(); }
 });
 
-test('Mari0 switches active portal color on Q and shoots it on left or right click', () => {
+test('Mari0 is self-contained in index.html, switches/indicates portal color, and persists DLCs in localStorage', async () => {
   const zlib = require('node:zlib');
-  const dataBuf = fs.readFileSync(path.join(ROOT, 'apps/games/mari0/game.data'));
-  const gameJs = source('apps/games/mari0/game.js');
-  const indexHtml = source('apps/games/mari0/index.html');
+  for (const oldFile of ['game.js', 'love.js', 'love.wasm', 'game.data']) {
+    assert.equal(fs.existsSync(path.join(ROOT, 'apps/games/mari0', oldFile)), false,
+      `apps/games/mari0/${oldFile} should be inlined inside index.html`);
+  }
 
-  const pkgMatch = gameJs.match(/loadPackage\((\{[\s\S]*?\})\);/);
-  assert.ok(pkgMatch, 'game.js must declare loadPackage metadata');
-  const meta = JSON.parse(pkgMatch[1]);
-  assert.equal(meta.remote_package_size, dataBuf.length, 'game.js remote_package_size must match game.data');
-  assert.equal(meta.files[0].end, dataBuf.length, 'game.js /game.love slice end must match game.data');
-  assert.notEqual(meta.package_uuid, '580c638c-82cb-4f22-9cad-8285d1bc7519',
-    'package_uuid must rotate so IndexedDB cache loads updated game.data');
+  const indexHtml = source('apps/games/mari0/index.html');
+  assert.equal(/<script\b[^>]*\bsrc\s*=/i.test(indexHtml), false,
+    'apps/games/mari0/index.html must not load external scripts');
+
+  const wasmMatch = indexHtml.match(/<script id="mari0-wasm-b64" type="text\/plain">([\s\S]*?)<\/script>/);
+  assert.ok(wasmMatch, 'index.html must embed love.wasm in base64');
+  const wasmBuf = Buffer.from(wasmMatch[1].trim(), 'base64');
+  assert.ok(wasmBuf.length >= 4000000, 'embedded love.wasm size check');
+  assert.equal(WebAssembly.validate(wasmBuf), true, 'embedded love.wasm must be valid WebAssembly');
+
+  const dataMatch = indexHtml.match(/<script id="mari0-data-b64" type="text\/plain">([\s\S]*?)<\/script>/);
+  assert.ok(dataMatch, 'index.html must embed patched game.data in base64');
+  const dataBuf = Buffer.from(dataMatch[1].trim(), 'base64');
+  assert.ok(dataBuf.length >= 3000000, 'embedded game.data size check');
+
+  function listZipNames(zipBuf) {
+    let eocd = -1;
+    for (let i = zipBuf.length - 22; i >= Math.max(0, zipBuf.length - 65558); i--) {
+      if (zipBuf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+    }
+    assert.ok(eocd !== -1, 'embedded game.data should have a valid ZIP EOCD');
+    let off = zipBuf.readUInt32LE(eocd + 16);
+    const total = zipBuf.readUInt16LE(eocd + 10);
+    const names = [];
+    for (let idx = 0; idx < total; idx++) {
+      assert.equal(zipBuf.readUInt32LE(off), 0x02014b50, 'invalid central directory header');
+      const nameLen = zipBuf.readUInt16LE(off + 28);
+      const extraLen = zipBuf.readUInt16LE(off + 30);
+      const commentLen = zipBuf.readUInt16LE(off + 32);
+      names.push(zipBuf.toString('utf8', off + 46, off + 46 + nameLen));
+      off += 46 + nameLen + extraLen + commentLen;
+    }
+    return names;
+  }
 
   function readZipEntry(zipBuf, name) {
     let eocd = -1;
     for (let i = zipBuf.length - 22; i >= Math.max(0, zipBuf.length - 65558); i--) {
       if (zipBuf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
     }
-    assert.ok(eocd !== -1, 'game.data should have a valid ZIP end-of-central-directory');
+    assert.ok(eocd !== -1, 'embedded game.data should have a valid ZIP end-of-central-directory');
     let off = zipBuf.readUInt32LE(eocd + 16);
     const total = zipBuf.readUInt16LE(eocd + 10);
     for (let idx = 0; idx < total; idx++) {
@@ -3554,19 +3581,122 @@ test('Mari0 switches active portal color on Q and shoots it on left or right cli
       const slice = zipBuf.subarray(dataStart, dataStart + compSize);
       return (method === 0 ? slice : zlib.inflateRawSync(slice)).toString('utf8');
     }
-    assert.fail(`missing ${name} in apps/games/mari0/game.data`);
+    assert.fail(`missing ${name} in embedded game.data`);
   }
+
+  const zipNames = listZipNames(dataBuf);
+  assert.equal(zipNames.some((n) => n.startsWith('mappacks/dlc_')), false,
+    'DLC mappacks should live in dlc_source/ until downloaded to localStorage');
+  assert.ok(zipNames.includes('dlc_source/dlc_acid_trip/settings.txt'));
 
   const marioLua = readZipEntry(dataBuf, 'mario.lua');
   const gameLua = readZipEntry(dataBuf, 'game.lua');
+  const mainLua = readZipEntry(dataBuf, 'main.lua');
+  const menuLua = readZipEntry(dataBuf, 'menu.lua');
 
   assert.match(marioLua, /\bself\.selectedportal\s*=\s*1\b/);
   assert.match(marioLua, /function mario:updateangle\(mx,\s*my\)/);
   assert.match(gameLua, /if key == "q" then[\s\S]*?selectedportal = \(target\.selectedportal == 2\) and 1 or 2/);
   assert.match(gameLua, /if button == 1 or button == 2 then[\s\S]*?v:updateangle\(x,\s*y\)[\s\S]*?if playertype == "portal" then[\s\S]*?playerportalbutton\(mouseowner,\s*v\.selectedportal or 1\)/);
   assert.match(gameLua, /activeportal = objects\["player"\]\[pl\]\.selectedportal or 1/);
+  assert.match(mainLua, /function reportportalcolor\(/);
+  assert.match(mainLua, /MARI0_PORTAL:/);
+  assert.match(menuLua, /function download_dlc_pack\(/);
+  assert.match(menuLua, /dlc_source\//);
   assert.match(indexHtml, /L\/R Click/);
   assert.match(indexHtml, /Switch Color: Q/);
+  assert.match(indexHtml, /\.portal-indicator\s*\{[\s\S]*?top:\s*12px;[\s\S]*?right:\s*12px;[\s\S]*?background:\s*#000000;/);
+
+  const dom = new JSDOM(indexHtml, {
+    url: 'https://example.test/apps/games/mari0/index.html',
+    runScripts: 'dangerously',
+    beforeParse(window) {
+      window.focus = () => {};
+      window.alert = () => {};
+      window.HTMLCanvasElement.prototype.getContext = function(kind) {
+        if (kind !== '2d') return null;
+        return {
+          canvas: this,
+          fillStyle: '#000',
+          font: '12px sans-serif',
+          textAlign: 'left',
+          fillRect() {},
+          fillText() {},
+          createImageData(w, h) { return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h }; },
+          putImageData() {}
+        };
+      };
+    }
+  });
+  try {
+    const win = dom.window;
+    await new Promise((r) => setTimeout(r, 650));
+
+    const ind = win.document.getElementById('portalIndicator');
+    assert.ok(ind, 'top-right portal indicator element must exist');
+    assert.equal(ind.textContent, 'BLUE');
+    assert.equal(ind.style.backgroundColor, 'rgb(0, 0, 0)');
+    assert.equal(ind.style.borderColor, 'rgb(60, 188, 252)');
+    assert.equal(ind.style.color, 'rgb(60, 188, 252)');
+
+    win.mari0DlcApi.handleBridgeMessage('MARI0_PORTAL:2:232,130,30');
+    assert.equal(ind.textContent, 'ORANGE');
+    assert.equal(ind.style.borderColor, 'rgb(232, 130, 30)');
+    assert.equal(ind.style.color, 'rgb(232, 130, 30)');
+
+    win.mari0DlcApi.handleBridgeMessage('MARI0_PORTAL:1:255,0,0');
+    assert.equal(ind.textContent, 'RED');
+    assert.equal(ind.style.borderColor, 'rgb(255, 0, 0)');
+    assert.equal(ind.style.color, 'rgb(255, 0, 0)');
+
+    const catalog = win.mari0DlcApi.getCatalog();
+    assert.equal(catalog.length, 6, 'all 6 built-in DLCs should be listed');
+    win.document.getElementById('dlcDownloadAllBtn').click();
+    assert.equal(win.document.getElementById('dlcCountBadge').textContent, '6');
+    for (const dlc of catalog) {
+      assert.equal(win.mari0DlcApi.isSaved(dlc.id), true);
+      const settings = win.Module.FS.readFile(`/home/web_user/love/LOVE/mari0/mappacks/${dlc.id}/settings.txt`, { encoding: 'utf8' });
+      assert.ok(settings.length > 0);
+    }
+
+    const customZip = win.mari0DlcApi.buildZipBytes({
+      'custom_test/settings.txt': Buffer.from('name=custom test\nauthor=qa\n'),
+      'custom_test/1-1.txt': Buffer.from('0-0-0;')
+    });
+    const impId = win.mari0DlcApi.importZip('custom_test.zip', customZip.buffer.slice(customZip.byteOffset, customZip.byteOffset + customZip.byteLength));
+    assert.equal(impId, 'custom_test');
+    assert.equal(win.mari0DlcApi.isSaved('custom_test'), true);
+
+    const lsSnapshot = {};
+    for (let i = 0; i < win.localStorage.length; i++) {
+      const k = win.localStorage.key(i);
+      lsSnapshot[k] = win.localStorage.getItem(k);
+    }
+    dom.window.close();
+
+    const dom2 = new JSDOM(indexHtml, {
+      url: 'https://example.test/apps/games/mari0/index.html',
+      runScripts: 'dangerously',
+      beforeParse(window) {
+        window.focus = () => {};
+        window.alert = () => {};
+        window.HTMLCanvasElement.prototype.getContext = function(kind) {
+          return kind === '2d' ? { canvas: this, fillRect() {}, fillText() {}, createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }) } : null;
+        };
+        for (const [k, v] of Object.entries(lsSnapshot)) window.localStorage.setItem(k, v);
+      }
+    });
+    try {
+      await new Promise((r) => setTimeout(r, 650));
+      assert.equal(dom2.window.document.getElementById('dlcCountBadge').textContent, '6');
+      const restored = dom2.window.Module.FS.readFile('/home/web_user/love/LOVE/mari0/mappacks/dlc_smb2J/settings.txt', { encoding: 'utf8' });
+      assert.ok(restored.includes('the lost levels'));
+    } finally {
+      dom2.window.close();
+    }
+  } finally {
+    try { dom.window.close(); } catch {}
+  }
 });
 
 test('Proton HTML loader bounds concurrent XHR fetches so single-threaded servers do not drop sockets', async () => {
