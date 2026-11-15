@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Piano</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: piano — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ PIANO ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    if (!document.getElementById('proton-piano-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-piano-css';
+      st.textContent = `
+        .piano-stage{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:18px;background:#0a0a0a;gap:14px}
+        .piano-keys{position:relative;display:flex;height:210px;width:min(100%,760px);user-select:none}
+        .piano-w{flex:1;background:#f7f7f7;color:#111;border:1px solid #888;border-radius:0 0 6px 6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:10px;font-size:11px;font-weight:700;position:relative;z-index:1}
+        .piano-w:hover,.piano-w.on{background:#d7e9f7}
+        .piano-b{position:absolute;top:0;width:4.2%;height:126px;background:#161616;color:#fff;border:1px solid #000;border-radius:0 0 5px 5px;z-index:2;transform:translateX(-50%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-size:10px}
+        .piano-b:hover,.piano-b.on{background:#3a3a3a}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const BLACK_SEMI = new Set([1, 3, 6, 8, 10]);
+    const KEYMAP = {
+      a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71,
+      k: 72, o: 73, l: 74, p: 75, ';': 76, "'": 77,
+    };
+
+    const notes = [];
+    let whiteIdx = 0;
+    for (let midi = 60; midi <= 84; midi++) {
+      const semi = midi % 12;
+      const oct = Math.floor(midi / 12) - 1;
+      const black = BLACK_SEMI.has(semi);
+      notes.push({ midi, name: `${NAMES[semi]}${oct}`, black, whiteBefore: whiteIdx });
+      if (!black) whiteIdx++;
+    }
+
+    body.innerHTML = `${bar('Piano', `
+      <select id="piano-wave" style="padding:4px 8px">
+        <option value="triangle">Soft</option>
+        <option value="sine">Sine</option>
+        <option value="sawtooth">Synth</option>
+        <option value="square">Square</option>
+      </select>
+      <button type="button" class="btn sm" id="piano-rec">${iconSvg('disc')} Record</button>
+      <button type="button" class="btn sm" id="piano-play" disabled>${iconSvg('play')} Playback</button>
+      <span id="piano-note" class="muted">Play keys with click or A-L keyboard</span>
+    `)}
+    <div class="piano-stage">
+      <div class="piano-keys" id="piano-keys"></div>
+    </div>`;
+
+    const keysWrap = body.querySelector('#piano-keys');
+    const waveEl = body.querySelector('#piano-wave');
+    const recBtn = body.querySelector('#piano-rec');
+    const playBtn = body.querySelector('#piano-play');
+    const noteEl = body.querySelector('#piano-note');
+
+    const totalWhites = notes.filter((n) => !n.black).length;
+    const btnByMidi = new Map();
+    notes.forEach((n) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.midi = String(n.midi);
+      btn.className = n.black ? 'piano-b' : 'piano-w';
+      btn.textContent = n.name;
+      if (n.black) btn.style.left = `${(n.whiteBefore / totalWhites) * 100}%`;
+      keysWrap.appendChild(btn);
+      btnByMidi.set(n.midi, btn);
+    });
+
+    let ctx = null;
+    let recording = false;
+    let recStart = 0;
+    let recorded = [];
+    const replayTimers = [];
+
+    const playMidi = (midi) => {
+      const el = btnByMidi.get(midi);
+      if (el) {
+        el.classList.add('on');
+        setTimeout(() => el.classList.remove('on'), 180);
+      }
+      noteEl.textContent = notes.find((n) => n.midi === midi)?.name || `MIDI ${midi}`;
+      if (recording) recorded.push({ midi, at: Date.now() - recStart });
+
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      try {
+        if (!ctx) ctx = new AC();
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = waveEl.value || 'triangle';
+        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.24, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.56);
+      } catch {}
+    };
+
+    keysWrap.addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('[data-midi]');
+      if (!btn) return;
+      playMidi(Number(btn.dataset.midi));
+    });
+    keysWrap.addEventListener('click', (e) => {
+      if (e.detail === 0) {
+        const btn = e.target.closest('[data-midi]');
+        if (btn) playMidi(Number(btn.dataset.midi));
+      }
+    });
+
+    recBtn.onclick = () => {
+      recording = !recording;
+      if (recording) {
+        recorded = [];
+        recStart = Date.now();
+        recBtn.classList.add('danger');
+        recBtn.textContent = 'Stop';
+        playBtn.disabled = true;
+      } else {
+        recBtn.classList.remove('danger');
+        recBtn.innerHTML = `${iconSvg('disc')} Record`;
+        playBtn.disabled = recorded.length === 0;
+      }
+    };
+
+    playBtn.onclick = () => {
+      replayTimers.forEach((t) => clearTimeout(t));
+      replayTimers.length = 0;
+      recorded.forEach((ev) => {
+        replayTimers.push(setTimeout(() => { if (body.isConnected) playMidi(ev.midi); }, ev.at));
+      });
+    };
+
+    body.addEventListener('keydown', (e) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      const midi = KEYMAP[e.key.toLowerCase()];
+      if (midi) { e.preventDefault(); playMidi(midi); }
+    });
+
+    body.onDestroy = () => {
+      replayTimers.forEach((t) => clearTimeout(t));
+      if (ctx && ctx.state !== 'closed') ctx.close().catch(() => {});
+    };
+  },
+});
+</script>
+</body>
+</html>

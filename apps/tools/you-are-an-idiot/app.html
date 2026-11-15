@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>You Are An Idiot - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>You Are An Idiot</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: you-are-an-idiot — adapted from Mist0090/youareanidiot.cc.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ YOU ARE AN IDIOT ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body, options = {}) {
+    if (!document.getElementById('proton-idiot-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-idiot-css';
+      st.textContent = `
+        #desktop.idiot-shake .windows-layer{animation:idiot-shake .18s infinite alternate}
+        @keyframes idiot-shake{0%{transform:translate(-2px,-1px)}50%{transform:translate(2px,1px)}100%{transform:translate(-1px,2px)}}
+        .idiot-card{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;background:#ffffff;color:#000000;text-align:center}
+        .idiot-card.alt{background:#000000;color:#ffffff}
+        .idiot-faces{font-size:28px;font-weight:900;letter-spacing:.12em}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const ctrl = window.__protonIdiotCtrl ||= { stopped: false, seq: 0, timers: new Set() };
+    const isClone = !!options.clone;
+    const canPlayMedia = typeof navigator === 'undefined' || !/\bjsdom\b/i.test(navigator.userAgent || '');
+    if (!isClone) {
+      ctrl.stopped = false;
+      document.getElementById('desktop')?.classList.add('idiot-shake');
+    }
+
+    const stopAll = () => {
+      ctrl.stopped = true;
+      for (const t of ctrl.timers) {
+        clearInterval(t);
+        clearTimeout(t);
+      }
+      ctrl.timers.clear();
+      document.getElementById('desktop')?.classList.remove('idiot-shake');
+      for (const key of [...wins.keys()]) {
+        const w = wins.get(key);
+        if (w?.appId === 'you-are-an-idiot' || key === 'you-are-an-idiot' || key.startsWith('you-are-an-idiot#')) {
+          if (canPlayMedia) { try { w.body.querySelector('video')?.pause?.(); } catch {} }
+          closeWin(key, true);
+        }
+      }
+    };
+
+    const spawnClone = () => {
+      if (ctrl.stopped) return;
+      const openCount = [...wins.values()].filter((w) => w.appId === 'you-are-an-idiot').length;
+      if (openCount >= 14) return;
+      ctrl.seq += 1;
+      openApp('you-are-an-idiot', { winKey: `you-are-an-idiot#clone-${ctrl.seq}`, clone: true, w: 320, h: 250 });
+    };
+
+    if (!isClone) {
+      body.innerHTML = `<div class="idiot-card">
+        <video id="idiot-app-video" src="assets/youare.mp4" autoplay loop playsinline style="width:100%;max-height:240px;background:#000;border-radius:6px;object-fit:contain"></video>
+        <div class="idiot-faces">YOU ARE AN IDIOT</div>
+        <button type="button" class="btn danger" data-stop>Make it stop</button>
+      </div>`;
+      const vid = body.querySelector('#idiot-app-video');
+      if (canPlayMedia) { try { vid?.play?.()?.catch?.(() => {}); } catch {} }
+      const t1 = setTimeout(() => { spawnClone(); spawnClone(); }, 120);
+      ctrl.timers.add(t1);
+    } else {
+      body.innerHTML = `<div class="idiot-card">
+        <div class="idiot-faces">YOU ARE AN IDIOT</div>
+        <p style="margin:0;font-weight:700">HAHAHA!</p>
+        <button type="button" class="btn danger sm" data-stop>Make it stop</button>
+      </div>`;
+      const card = body.querySelector('.idiot-card');
+      const winEl = options.winEl;
+      let vx = (ctrl.seq % 2 === 0 ? 1 : -1) * (14 + (ctrl.seq % 5) * 4);
+      let vy = (ctrl.seq % 3 === 0 ? 1 : -1) * (12 + (ctrl.seq % 4) * 3);
+      let x = 24 + ((ctrl.seq * 73) % Math.max(80, window.innerWidth - 360));
+      let y = 24 + ((ctrl.seq * 59) % Math.max(80, window.innerHeight - 320));
+      if (winEl) {
+        winEl.style.left = `${x}px`;
+        winEl.style.top = `${y}px`;
+      }
+      const bounce = setInterval(() => {
+        if (ctrl.stopped || !body.isConnected || !winEl) { clearInterval(bounce); return; }
+        const maxX = Math.max(40, window.innerWidth - (winEl.offsetWidth || 320));
+        const maxY = Math.max(40, window.innerHeight - 44 - (winEl.offsetHeight || 250));
+        x += vx;
+        y += vy;
+        if (x <= 0 || x >= maxX) { vx = -vx; x = Math.max(0, Math.min(maxX, x)); }
+        if (y <= 0 || y >= maxY) { vy = -vy; y = Math.max(0, Math.min(maxY, y)); }
+        winEl.style.left = `${Math.round(x)}px`;
+        winEl.style.top = `${Math.round(y)}px`;
+        card?.classList.toggle('alt');
+      }, 60);
+      ctrl.timers.add(bounce);
+    }
+
+    body.querySelector('[data-stop]').onclick = stopAll;
+    body.beforeClose = () => {
+      if (ctrl.stopped) return true;
+      spawnClone();
+      spawnClone();
+      return false;
+    };
+    body.onDestroy = () => {
+      if (canPlayMedia) { try { body.querySelector('video')?.pause?.(); } catch {} }
+      if (!isClone && ctrl.stopped) {
+        document.getElementById('desktop')?.classList.remove('idiot-shake');
+      }
+    };
+  },
+});
+</script>
+</body>
+</html>

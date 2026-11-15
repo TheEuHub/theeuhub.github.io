@@ -1,0 +1,13 @@
+{
+  "name": "Kart Bros",
+  "short_name": "Kart Bros",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

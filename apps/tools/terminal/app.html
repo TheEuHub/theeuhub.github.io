@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Terminal</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: terminal — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ TERMINAL ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    if (!document.getElementById('proton-term-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-term-css';
+      st.textContent = `
+        .term-wrap{flex:1;min-height:0;display:flex;flex-direction:column;background:#080808;color:#eaeaea;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;position:relative}
+        .term-out{flex:1;min-height:0;overflow:auto;padding:12px 14px;white-space:pre-wrap;word-break:break-word}
+        .term-form{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid #262626;background:#050505}
+        .term-prompt{color:#9ad678;font-weight:700;white-space:nowrap}
+        .term-in{flex:1;border:0!important;background:transparent!important;color:#ffffff!important;outline:none!important;font:inherit}
+        .term-nano{position:absolute;inset:0;display:none;flex-direction:column;background:#0a0a0a;z-index:4}
+        .nano-head{padding:7px 12px;background:#1e1e1e;color:#fff;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+        .nano-ta{flex:1;min-height:0;border:0!important;border-radius:0!important;background:#0b0b0b!important;color:#f5f5f5!important;padding:12px!important;font:inherit;resize:none;outline:none}
+        .nano-foot{padding:7px 12px;background:#171717;border-top:1px solid #2e2e2e;font-size:12px;color:#ccc;display:flex;justify-content:space-between;gap:10px}
+        .nano-confirm{position:absolute;left:0;right:0;bottom:34px;display:none;align-items:center;gap:8px;padding:9px 12px;background:#202020;border-top:1px solid #444;z-index:5}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const home = FS.home();
+    let cwd = home;
+    const history = [];
+    let histIdx = -1;
+
+    body.innerHTML = `${bar('Terminal', '<span class="muted">Virtual shell over your proton home folder (help for commands)</span>')}
+      <div class="term-wrap">
+        <div class="term-out" id="term-out"></div>
+        <form class="term-form" id="term-form">
+          <span class="term-prompt" id="term-prompt"></span>
+          <input type="text" class="term-in" id="term-in" autocomplete="off" spellcheck="false" aria-label="Terminal command">
+        </form>
+        <div class="term-nano" id="term-nano" style="display:none">
+          <div class="nano-head"><span id="nano-title">GNU nano</span><span id="nano-dirty" class="muted"></span></div>
+          <textarea class="nano-ta" id="nano-ta" spellcheck="false"></textarea>
+          <div class="nano-confirm" id="nano-confirm" style="display:none">
+            <span>Save modified buffer?</span>
+            <button type="button" class="btn sm primary" id="nano-confirm-save">Save</button>
+            <button type="button" class="btn sm danger" id="nano-confirm-discard">Discard</button>
+            <button type="button" class="btn sm" id="nano-confirm-cancel">Cancel</button>
+          </div>
+          <div class="nano-foot">
+            <span>Ctrl+S Save · Ctrl+X Exit</span>
+            <span id="nano-msg"></span>
+          </div>
+        </div>
+      </div>`;
+
+    const outEl = body.querySelector('#term-out');
+    const form = body.querySelector('#term-form');
+    const input = body.querySelector('#term-in');
+    const promptEl = body.querySelector('#term-prompt');
+    const nanoPane = body.querySelector('#term-nano');
+    const nanoTitle = body.querySelector('#nano-title');
+    const nanoDirtyEl = body.querySelector('#nano-dirty');
+    const nanoTa = body.querySelector('#nano-ta');
+    const nanoMsg = body.querySelector('#nano-msg');
+    const nanoConfirm = body.querySelector('#nano-confirm');
+
+    const prettyPath = (p) => {
+      if (p === home) return '~';
+      if (p.startsWith(home + '/')) return '~/' + p.slice(home.length + 1);
+      return p;
+    };
+
+    const syncPrompt = () => {
+      const user = currentUser?.username || 'user';
+      promptEl.textContent = `${user}@proton:${prettyPath(cwd)}$`;
+    };
+
+    const print = (line = '') => {
+      outEl.textContent += (outEl.textContent ? '\n' : '') + line;
+      outEl.scrollTop = outEl.scrollHeight;
+    };
+
+    const resolveArg = (arg = '.') => {
+      if (!arg || arg === '.') return cwd;
+      if (arg === '~') return home;
+      if (arg.startsWith('~/')) return FS.normalize(home + '/' + arg.slice(2));
+      return FS.normalize(arg.startsWith('/') ? arg : FS.join(cwd, arg));
+    };
+
+    const tokenize = (line) => {
+      const tokens = [];
+      let cur = '', quote = '', had = false, unquoted = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (quote) {
+          if (ch === quote) quote = '';
+          else if (ch === '\\' && quote === '"' && i + 1 < line.length) cur += line[++i];
+          else cur += ch;
+        } else if (ch === '"' || ch === "'") {
+          quote = ch;
+          had = true;
+        } else if (/\s/.test(ch)) {
+          if (had) { tokens.push({ v: cur, unquoted }); cur = ''; had = false; unquoted = false; }
+        } else if (ch === '\\' && i + 1 < line.length) {
+          cur += line[++i]; had = true; unquoted = true;
+        } else {
+          cur += ch; had = true; unquoted = true;
+        }
+      }
+      if (had) tokens.push({ v: cur, unquoted });
+      return tokens;
+    };
+
+    const parseFlags = (args, allowed) => {
+      const flags = new Set();
+      const rest = [];
+      let stop = false;
+      for (const a of args) {
+        if (!stop && a === '--') { stop = true; continue; }
+        if (!stop && a.startsWith('-') && a.length > 1) {
+          for (const ch of a.slice(1)) {
+            if (!allowed.includes(ch)) return { error: `unknown option "-${ch}"` };
+            flags.add(ch);
+          }
+        } else {
+          rest.push(a);
+        }
+      }
+      return { flags, rest };
+    };
+
+    let nanoPath = '';
+    let nanoDirty = false;
+    const openNano = async (targetPath) => {
+      nanoPath = targetPath;
+      let text = '';
+      if (FS.exists(nanoPath)) {
+        const st = FS.stat(nanoPath);
+        if (st.type === 'dir') { print(`nano: ${targetPath} is a directory`); return; }
+        text = await FS.read(nanoPath);
+      }
+      nanoTa.value = text;
+      nanoDirty = false;
+      nanoTitle.textContent = `GNU nano — ${prettyPath(nanoPath)}`;
+      nanoDirtyEl.textContent = '';
+      nanoMsg.textContent = '';
+      nanoConfirm.style.display = 'none';
+      nanoPane.style.display = 'flex';
+      nanoTa.focus();
+    };
+
+    const saveNano = () => {
+      FS.write(nanoPath, nanoTa.value);
+      nanoDirty = false;
+      nanoDirtyEl.textContent = '';
+      const lines = nanoTa.value === '' ? 0 : nanoTa.value.split('\n').length;
+      const note = `Wrote ${lines} lines to ${prettyPath(nanoPath)}`;
+      nanoMsg.textContent = note;
+      print(note);
+    };
+
+    const closeNano = () => {
+      nanoConfirm.style.display = 'none';
+      nanoPane.style.display = 'none';
+      input.focus();
+    };
+
+    nanoTa.addEventListener('input', () => {
+      nanoDirty = true;
+      nanoDirtyEl.textContent = '[Modified]';
+    });
+    nanoTa.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveNano();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        if (!nanoDirty) closeNano();
+        else nanoConfirm.style.display = 'flex';
+      }
+    });
+    body.querySelector('#nano-confirm-save').onclick = () => { saveNano(); closeNano(); };
+    body.querySelector('#nano-confirm-discard').onclick = () => closeNano();
+    body.querySelector('#nano-confirm-cancel').onclick = () => { nanoConfirm.style.display = 'none'; nanoTa.focus(); };
+
+    const runLine = async (rawLine) => {
+      const line = rawLine.trim();
+      if (!line) return;
+      history.push(line);
+      histIdx = history.length;
+      print(`${promptEl.textContent} ${line}`);
+
+      const tokObjs = tokenize(line);
+      if (tokObjs.some((t) => t.unquoted && /[|><]/.test(t.v))) {
+        print('Syntax error: no pipes or redirection in this virtual shell.');
+        return;
+      }
+      const [cmd, ...args] = tokObjs.map((t) => t.v);
+
+      try {
+        switch (cmd) {
+          case 'help':
+            print('Commands: help, pwd, ls [-al], cd, cat, echo, mkdir [-p], touch, rm [-rf], cp [-r], mv, find, stat, tree, nano, open, date, whoami, clear');
+            break;
+          case 'pwd':
+            print(cwd);
+            break;
+          case 'whoami':
+            print(currentUser?.username || 'user');
+            break;
+          case 'date':
+            print(new Date().toString());
+            break;
+          case 'clear':
+            outEl.textContent = '';
+            break;
+          case 'echo':
+            print(args.join(' '));
+            break;
+          case 'cd': {
+            const target = resolveArg(args[0] || '~');
+            const st = FS.stat(target);
+            if (!st) print(`cd: ${args[0]}: No such file or directory`);
+            else if (st.type !== 'dir') print(`cd: ${args[0]}: Not a directory`);
+            else { cwd = st.path; syncPrompt(); }
+            break;
+          }
+          case 'ls': {
+            const p = parseFlags(args, 'al');
+            if (p.error) { print(`ls: ${p.error}`); break; }
+            const target = resolveArg(p.rest[0] || '.');
+            const st = FS.stat(target);
+            if (!st) { print(`ls: cannot access '${p.rest[0] || '.'}': No such file or directory`); break; }
+            if (st.type !== 'dir') { print(st.name); break; }
+            const items = FS.list(target);
+            if (p.flags.has('l')) {
+              print(items.map((it) => `${it.type === 'dir' ? 'd' : '-'}  ${String(it.size || 0).padStart(7)}  ${it.name}${it.type === 'dir' ? '/' : ''}`).join('\n'));
+            } else {
+              print(items.map((it) => it.type === 'dir' ? `${it.name}/` : it.name).join('  '));
+            }
+            break;
+          }
+          case 'cat': {
+            if (!args[0]) { print('cat: missing file operand'); break; }
+            const target = resolveArg(args[0]);
+            const st = FS.stat(target);
+            if (!st) print(`cat: ${args[0]}: No such file or directory`);
+            else if (st.type === 'dir') print(`cat: ${args[0]}: Is a directory`);
+            else print(await FS.read(target));
+            break;
+          }
+          case 'mkdir': {
+            const p = parseFlags(args, 'p');
+            if (p.error) { print(`mkdir: ${p.error}`); break; }
+            if (!p.rest.length) { print('mkdir: missing operand'); break; }
+            for (const dirArg of p.rest) {
+              const target = resolveArg(dirArg);
+              if (p.flags.has('p')) {
+                const segs = target.split('/').filter(Boolean);
+                let cur = '';
+                for (const s of segs) {
+                  cur += '/' + s;
+                  if (!FS.exists(cur)) FS.mkdir(cur);
+                }
+              } else {
+                FS.mkdir(target);
+              }
+            }
+            break;
+          }
+          case 'touch': {
+            if (!args.length) { print('touch: missing file operand'); break; }
+            for (const fileArg of args) {
+              const target = resolveArg(fileArg);
+              if (!FS.exists(target)) FS.write(target, '');
+            }
+            break;
+          }
+          case 'rm': {
+            const p = parseFlags(args, 'rf');
+            if (p.error) { print(`rm: ${p.error}`); break; }
+            if (!p.rest.length) { print('rm: missing operand'); break; }
+            const rec = p.flags.has('r');
+            const force = p.flags.has('f');
+            for (const itemArg of p.rest) {
+              const target = resolveArg(itemArg);
+              if (target === '/' || target === '/home' || target === cwd || cwd.startsWith(target + '/')) {
+                print(`rm: refusing to remove "${itemArg}"`);
+                continue;
+              }
+              const st = FS.stat(target);
+              if (!st) {
+                if (!force) print(`rm: cannot remove '${itemArg}': No such file or directory`);
+                continue;
+              }
+              if (st.type === 'dir' && !rec && FS.list(target).length > 0) {
+                print('rm: Directory not empty');
+                continue;
+              }
+              FS.rm(target, '/', rec);
+            }
+            break;
+          }
+          case 'cp': {
+            const p = parseFlags(args, 'r');
+            if (p.error) { print(`cp: ${p.error}`); break; }
+            if (p.rest.length < 2) { print('cp: missing destination operand'); break; }
+            const src = resolveArg(p.rest[0]);
+            let dst = resolveArg(p.rest[1]);
+            if (FS.isDir(dst)) dst = FS.join(dst, FS.basename(src));
+            await FS.copy(src, dst);
+            break;
+          }
+          case 'mv': {
+            if (args.length < 2) { print('mv: missing destination operand'); break; }
+            const src = resolveArg(args[0]);
+            let dst = resolveArg(args[1]);
+            if (FS.isDir(dst)) dst = FS.join(dst, FS.basename(src));
+            FS.rename(src, dst);
+            break;
+          }
+          case 'stat': {
+            if (!args[0]) { print('stat: missing operand'); break; }
+            const target = resolveArg(args[0]);
+            const st = FS.stat(target);
+            if (!st) print(`stat: cannot stat '${args[0]}': No such file or directory`);
+            else print(`  File: ${st.path}\n  Type: ${st.type}\n  Size: ${st.size ?? 0}`);
+            break;
+          }
+          case 'find': {
+            const q = args[0] || '';
+            const root = resolveArg(args[1] || cwd);
+            const matches = FS.find(q, root);
+            if (!matches.length) print('(no matches)');
+            else print(matches.map((m) => m.path).join('\n'));
+            break;
+          }
+          case 'tree': {
+            const target = resolveArg(args[0] || '.');
+            const st = FS.stat(target);
+            if (!st) { print(`tree: ${args[0] || '.'}: No such file or directory`); break; }
+            if (st.type !== 'dir') { print(st.path); break; }
+            const lines = [args[0] || '.'];
+            let dirs = 0, files = 0;
+            const walk = (dirPath, prefix) => {
+              const children = FS.list(dirPath);
+              children.forEach((child, idx) => {
+                const last = idx === children.length - 1;
+                lines.push(`${prefix}${last ? '└── ' : '├── '}${child.name}`);
+                if (child.type === 'dir') {
+                  dirs++;
+                  walk(child.path, prefix + (last ? '    ' : '│   '));
+                } else {
+                  files++;
+                }
+              });
+            };
+            walk(st.path, '');
+            lines.push('', `${dirs} director${dirs === 1 ? 'y' : 'ies'}, ${files} file${files === 1 ? '' : 's'}`);
+            print(lines.join('\n'));
+            break;
+          }
+          case 'nano': {
+            if (!args[0]) { print('nano: missing file name'); break; }
+            await openNano(resolveArg(args[0]));
+            break;
+          }
+          case 'open': {
+            if (!args[0]) { print('open: missing path'); break; }
+            openFSItem(resolveArg(args[0]));
+            break;
+          }
+          default:
+            print(`Unknown command: ${cmd}`);
+        }
+      } catch (err) {
+        print(err?.message || String(err));
+      }
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const val = input.value;
+      input.value = '';
+      await runLine(val);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' && history.length) {
+        e.preventDefault();
+        histIdx = Math.max(0, histIdx - 1);
+        input.value = history[histIdx] || '';
+      } else if (e.key === 'ArrowDown' && history.length) {
+        e.preventDefault();
+        histIdx = Math.min(history.length, histIdx + 1);
+        input.value = history[histIdx] || '';
+      }
+    });
+
+    syncPrompt();
+    print('proton shell ready — type "help" for commands.');
+    input.focus();
+  },
+});
+</script>
+</body>
+</html>

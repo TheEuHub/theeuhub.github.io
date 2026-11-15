@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Center - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>App Center</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<!-- proton app: everything that registers and renders this app lives in
+     this one script block. Edit it, then reload proton. -->
+<script data-proton-app>
+/* proton app module: app-center — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ APP CENTER ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    normalizeUserData();
+    body.innerHTML = `${bar('App Center', `<input type="search" id="ac-q" placeholder="Search apps">`)}
+    <div class="app-main pad">
+    <div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">Everything here is part of the static proton website</h3>
+      <p class="muted">Adding websites and web-address apps is disabled. You can still visit an address from the Browser without saving it, and hide or restore the built-in apps below.</p>
+</div>
+
+    <h3>${iconSvg('layers')} All apps</h3>
+    <div class="grid-cards" id="ac-grid"></div></div>`;
+
+    const PROTECTED = ['appcenter', 'settings']; // removing these would lock you out of managing apps
+    function draw() {
+      const q = body.querySelector('#ac-q').value.trim().toLowerCase();
+      const match = (a) => !q || (a.name + ' ' + (a.desc || '') + ' ' + (a.url || '')).toLowerCase().includes(q);
+
+      body.querySelector('#ac-grid').innerHTML = Object.values(APPS)
+        .filter((a) => a.id !== 'appcenter' && !dynamicAppIds.has(a.id) && match(a))
+        .map((a) => {
+          const pinned = (userData.settings.pinned || []).includes(a.id);
+          const removed = (userData.hiddenApps || []).includes(a.id);
+          let buttons;
+          if (removed) buttons = `<button class="btn sm primary" data-restore="${a.id}">${iconSvg('plus')} ${a.preinstalled === false ? 'Install' : 'Add back'}</button>`;
+          else {
+            buttons = `<button class="btn sm primary" data-open="${MH.esc(a.id)}">Open</button><button class="btn sm" data-pin="${MH.esc(a.id)}">${pinned ? 'Unpin' : iconSvg('pin') + ' Pin'}</button><button class="btn sm" data-desktop="${MH.esc(a.id)}">${userData.desktopIcons.some((x) => x.kind === 'app' && x.target === a.id) ? 'Remove desktop icon' : iconSvg('plus') + ' Desktop icon'}</button>`;
+            buttons += PROTECTED.includes(a.id)
+              ? '<span class="muted" title="This one keeps the desktop manageable">Built-in</span>'
+              : `<button class="btn sm" data-remove="${a.id}">Remove</button>`;
+          }
+          return `<div class="card" ${removed ? 'style="opacity:.62"' : ''}><div class="card-ic" style="font-size:30px">${appIcon(a)}</div><h3 style="margin:7px 0 3px">${MH.esc(a.name)}</h3>
+          <p class="muted" style="min-height:34px">${MH.esc(a.desc)}</p><span class="chip">${a.cat}</span>${removed ? ' <span class="chip" style="background:#f8d7d4;color:#8c2b24">Removed</span>' : ''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:11px">${buttons}</div></div>`;
+        }).join('');
+      body.querySelectorAll('[data-open]').forEach((b) => b.onclick = () => openApp(b.dataset.open));
+      body.querySelectorAll('[data-desktop]').forEach((b) => b.onclick = () => {
+        const id = b.dataset.desktop;
+        const existing = userData.desktopIcons.find((x) => x.kind === 'app' && x.target === id);
+        if (existing ? DesktopIcons.remove(existing.id) : DesktopIcons.addApp(id)) draw();
+      });
+      body.querySelectorAll('[data-pin]').forEach((b) => b.onclick = () => {
+        const id = b.dataset.pin, p = userData.settings.pinned;
+        userData.settings.pinned = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+        saveData(); renderPanelApps(); draw();
+      });
+      body.querySelectorAll('[data-remove]').forEach((b) => b.onclick = () => {
+        const a = APPS[b.dataset.remove];
+        if (!a || !confirmBox(`Remove “${a.name}” from the proton menu? You can add it back here any time.`)) return;
+        if (!closeWin(a.id)) return;
+        userData.hiddenApps.push(a.id);
+        userData.installedApps = (userData.installedApps || []).filter((x) => x !== a.id);
+        userData.settings.pinned = (userData.settings.pinned || []).filter((x) => x !== a.id);
+        saveData(); refreshChrome(); draw(); MH.toast(`“${a.name}” removed — find it here to add it back.`);
+      });
+      body.querySelectorAll('[data-restore]').forEach((b) => b.onclick = () => {
+        const a = APPS[b.dataset.restore];
+        userData.hiddenApps = userData.hiddenApps.filter((x) => x !== b.dataset.restore);
+        if (a && a.preinstalled === false) {
+          userData.installedApps = [...new Set([...(userData.installedApps || []), a.id])];
+          saveData(); refreshChrome(); draw(); MH.toast(`“${a.name}” installed — find it in the proton menu.`);
+          return;
+        }
+        saveData(); refreshChrome(); draw(); MH.toast('App added back to the proton menu.');
+      });
+    }
+
+    body.querySelector('#ac-q').addEventListener('input', draw);
+    draw();
+  },
+});
+</script>
+</body>
+</html>

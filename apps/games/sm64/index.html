@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Super Mario 64</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #eee; font: 12px/1.4 system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  .bar { flex: none; display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: #111; border-bottom: 1px solid #2c2c2c; }
+  .bar a { color: #9cf; text-decoration: none; }
+  .bar span { color: #aaa; }
+  #container { flex: 1; min-height: 0; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
+  canvas { border: 0 none; display: block; max-width: 100%; max-height: 100%; height: 100%; width: auto; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <a href="../">All games</a>
+  <span>Move: Arrows · A: X · B: C · Z: Shift · Start: Enter · Camera: WASD</span>
+</div>
+<div id="container">
+  <canvas class="emscripten" id="canvas" width="1280" height="720"></canvas>
+</div>
+<script type="text/javascript">
+  var Module = {
+    preRun: [],
+    postRun: [],
+    print: function(text) { console.log(text); },
+    printErr: function(text) { console.warn(text); },
+    canvas: (function() {
+      var canvas = document.getElementById('canvas');
+      canvas.addEventListener('webglcontextlost', function(e) {
+        alert('WebGL context lost. You will need to reload the page.');
+        e.preventDefault();
+      }, false);
+      return canvas;
+    })(),
+    setStatus: function(text) {}
+  };
+</script>
+<script async type="text/javascript" src="sm64.us.f3dex2e.js"></script>
+</body>
+</html>

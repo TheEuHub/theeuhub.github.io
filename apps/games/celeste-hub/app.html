@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Celeste Hub - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Celeste Hub</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+(() => {
+'use strict';
+
+const CELESTE_PAGES = [
+  { page: 'apps/games/celeste-classic/index.html', title: 'Celeste Classic', desc: 'The original PICO-8 Celeste by Maddy Thorson & Noel Berry' },
+  { page: 'apps/games/celeste-two/index.html', title: 'Celeste Classic 2', desc: "Official PICO-8 sequel featuring the grappling hook" },
+  { page: 'apps/games/celeste-community/index.html', title: 'Celeste Community', desc: 'Community speedrun hub & links' },
+  { page: 'apps/games/celeste-community/practice_mod_c.html', title: 'Celeste Classic Practice Mod', desc: 'v600m practice mod with level skip & HUD' },
+  { page: 'apps/games/celeste-community/cc2_practice_mod_1.0.html', title: 'Celeste Classic 2 Practice Mod 1.0', desc: 'Celeste Classic 2 v1.0 practice mod' },
+  { page: 'apps/games/celeste-community/cc2_practice_mod_1.1.html', title: 'Celeste Classic 2 Practice Mod 1.1', desc: 'Celeste Classic 2 v1.1 practice mod' },
+  { page: 'apps/games/celeste-community/webek.html', title: 'Celeste Webek', desc: 'Web-based Celeste Classic emulator & replay viewer' },
+  { page: 'apps/games/celeste-community/downloads.html', title: 'Celeste Classic Downloads', desc: 'Standalone cartridge & mod downloads' },
+];
+
+registerApp({
+  render(body) {
+    let activePage = null;
+    const renderUI = () => {
+      if (!activePage) {
+        body.innerHTML = `${bar('Celeste Hub', '<span class="muted">Choose a Celeste Classic edition or tool</span>')}
+        <div class="app-main pad" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;align-content:start">
+          ${CELESTE_PAGES.map((g, i) => `<button type="button" class="card" data-ch-game="${i}" style="text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:inherit">
+            <b style="font-size:14px">${MH.esc(g.title)}</b>
+            <span class="muted" style="font-size:12px">${MH.esc(g.desc)}</span>
+          </button>`).join('')}
+        </div>`;
+        body.querySelectorAll('[data-ch-game]').forEach((btn) => {
+          btn.onclick = () => {
+            activePage = CELESTE_PAGES[Number(btn.dataset.chGame)];
+            renderUI();
+          };
+        });
+        return;
+      }
+      body.innerHTML = `${bar(activePage.title, `<button type="button" class="btn sm" id="ch-again" data-e="back">${iconSvg('chevron-left')} Change game</button><button type="button" class="btn sm" data-e="reload">${iconSvg('refresh')} Reload</button><button type="button" class="btn sm" data-e="fs">${iconSvg('monitor')} Fullscreen</button><a class="btn sm primary" data-e="ext" href="${MH.esc(activePage.page)}" target="_blank" rel="noopener">${iconSvg('external')} Open in new tab</a>`)}
+      <iframe id="ch-frame" class="site-frame" src="${MH.esc(activePage.page)}" title="${MH.esc(activePage.title)}" allowfullscreen style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#000"></iframe>`;
+      const frame = body.querySelector('#ch-frame');
+      body.querySelector('#ch-again').onclick = () => { activePage = null; renderUI(); };
+      body.querySelector('[data-e="reload"]').onclick = () => { frame.src = activePage.page; };
+      body.querySelector('[data-e="fs"]').onclick = () => {
+        if (frame.requestFullscreen) frame.requestFullscreen().catch(() => {});
+      };
+      const ext = body.querySelector('[data-e="ext"]');
+      if (ext) ext.href = activePage.page;
+    };
+    renderUI();
+  },
+});
+})();
+</script>
+</body>
+</html>

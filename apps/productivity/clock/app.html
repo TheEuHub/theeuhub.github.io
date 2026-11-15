@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clock - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Clock</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<script data-proton-app>
+/* proton app module: clock — edit this file to change this app.
+ * Loaded by index.html; calls registerApp() (see apps/README.md). */
+'use strict';
+
+/* ============================ CLOCK ============================ */
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  render(body) {
+    if (!document.getElementById('proton-clock-css')) {
+      const st = document.createElement('style');
+      st.id = 'proton-clock-css';
+      st.textContent = `
+        .clk-now{font-size:42px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.03em;margin:4px 0}
+        .clk-sw{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;margin:8px 0}
+        .clk-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+        .clk-laps{margin:10px 0 0;padding-left:20px;max-height:110px;overflow:auto;font-size:13px;color:var(--muted)}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const formatMs = (ms) => {
+      const total = Math.max(0, Math.floor(ms));
+      const m = Math.floor(total / 60000);
+      const s = Math.floor((total % 60000) / 1000);
+      const cs = Math.floor((total % 1000) / 10);
+      return `${pad(m)}:${pad(s)}.${pad(cs)}`;
+    };
+
+    body.innerHTML = `${bar('Clock')}
+      <div class="app-main pad" style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <div class="muted" id="clock-date"></div>
+          <div class="clk-now" id="clock-now">${formatClock(new Date())}</div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 4px">Stopwatch</h3>
+          <div class="clk-sw" id="sw-readout">00:00.00</div>
+          <div class="clk-row">
+            <button type="button" class="btn primary" id="sw-toggle">Start</button>
+            <button type="button" class="btn" id="sw-lap">Lap</button>
+            <button type="button" class="btn" id="sw-reset">Reset</button>
+          </div>
+          <ol class="clk-laps" id="sw-laps"></ol>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px">Timer</h3>
+          <div class="clk-row">
+            <label>Minutes <input type="number" id="tm-min" min="0" max="999" value="5" style="width:72px;padding:6px"></label>
+            <label>Seconds <input type="number" id="tm-sec" min="0" max="59" value="0" style="width:72px;padding:6px"></label>
+            <button type="button" class="btn primary" id="tm-toggle">Start</button>
+            <button type="button" class="btn" id="tm-reset">Reset</button>
+            <span class="clk-sw" id="tm-readout" style="font-size:24px;margin:0 0 0 auto">05:00</span>
+          </div>
+        </div>
+      </div>`;
+
+    const nowEl = body.querySelector('#clock-now');
+    const dateEl = body.querySelector('#clock-date');
+    const swReadout = body.querySelector('#sw-readout');
+    const swToggle = body.querySelector('#sw-toggle');
+    const swLaps = body.querySelector('#sw-laps');
+    const tmMin = body.querySelector('#tm-min');
+    const tmSec = body.querySelector('#tm-sec');
+    const tmToggle = body.querySelector('#tm-toggle');
+    const tmReadout = body.querySelector('#tm-readout');
+
+    let swRunning = false, swElapsed = 0, swStart = 0;
+    let tmRunning = false, tmLeftMs = 300000, tmEnd = 0;
+
+    const refresh = () => {
+      if (!body.isConnected) { clearInterval(timer); return; }
+      const d = new Date();
+      nowEl.textContent = formatClock(d);
+      dateEl.textContent = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      if (swRunning) swReadout.textContent = formatMs(swElapsed + (Date.now() - swStart));
+      if (tmRunning) {
+        const rem = Math.max(0, tmEnd - Date.now());
+        tmLeftMs = rem;
+        const sec = Math.ceil(rem / 1000);
+        tmReadout.textContent = `${pad(Math.floor(sec / 60))}:${pad(sec % 60)}`;
+        if (rem === 0) {
+          tmRunning = false;
+          tmToggle.textContent = 'Start';
+          MH.toast('Timer finished.');
+        }
+      }
+    };
+    refresh();
+    const timer = setInterval(refresh, 100);
+
+    swToggle.onclick = () => {
+      if (swRunning) {
+        swElapsed += Date.now() - swStart;
+        swRunning = false;
+        swToggle.textContent = 'Start';
+        swReadout.textContent = formatMs(swElapsed);
+      } else {
+        swStart = Date.now();
+        swRunning = true;
+        swToggle.textContent = 'Pause';
+      }
+    };
+    body.querySelector('#sw-lap').onclick = () => {
+      const cur = swRunning ? swElapsed + (Date.now() - swStart) : swElapsed;
+      const li = document.createElement('li');
+      li.textContent = formatMs(cur);
+      swLaps.prepend(li);
+    };
+    body.querySelector('#sw-reset').onclick = () => {
+      swRunning = false;
+      swElapsed = 0;
+      swToggle.textContent = 'Start';
+      swReadout.textContent = '00:00.00';
+      swLaps.innerHTML = '';
+    };
+
+    const syncTimerInput = () => {
+      const m = Math.max(0, parseInt(tmMin.value || '0', 10) || 0);
+      const s = Math.max(0, Math.min(59, parseInt(tmSec.value || '0', 10) || 0));
+      tmLeftMs = (m * 60 + s) * 1000;
+      tmReadout.textContent = `${pad(m)}:${pad(s)}`;
+    };
+    tmToggle.onclick = () => {
+      if (tmRunning) {
+        tmLeftMs = Math.max(0, tmEnd - Date.now());
+        tmRunning = false;
+        tmToggle.textContent = 'Start';
+      } else {
+        if (tmLeftMs <= 0) syncTimerInput();
+        if (tmLeftMs <= 0) return;
+        tmEnd = Date.now() + tmLeftMs;
+        tmRunning = true;
+        tmToggle.textContent = 'Pause';
+      }
+    };
+    body.querySelector('#tm-reset').onclick = () => {
+      tmRunning = false;
+      tmToggle.textContent = 'Start';
+      syncTimerInput();
+    };
+    tmMin.onchange = () => { if (!tmRunning) syncTimerInput(); };
+    tmSec.onchange = () => { if (!tmRunning) syncTimerInput(); };
+
+    body.onDestroy = () => clearInterval(timer);
+  },
+});
+</script>
+</body>
+</html>

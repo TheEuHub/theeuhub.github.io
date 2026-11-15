@@ -1,0 +1,3 @@
+Mari0 v1.6 (Mario x Portal) by Maurice Guegan / Stabyourself (MIT)
+Web runtime: love.js 11.4.1 by Davidobot & Tanner Rogalsky (MIT, see LOVEJS-LICENSE.txt)
+Offline web compatibility shims: LuaSocket offline stub, WebGL shader guard, OpenAL per-source stop wrapper.

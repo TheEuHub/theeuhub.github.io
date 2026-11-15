@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mox - proton app</title>
+</head>
+<body>
+<p>This file is a proton app. It is not meant to be opened on its own:
+open <a href="../../../index.html">proton</a> and launch <b>Mox</b> from the
+proton menu. The script below is fetched and run by proton's HTML loader
+(assets/html-loader.js) at boot.</p>
+<!-- proton app: everything that registers and renders this app lives in
+     this one script block. Edit it, then reload proton. -->
+<script data-proton-app>
+/* proton app module: mox — Mox is the desktop's AI: a small language model
+ * that runs in this browser, so nothing typed into it leaves the device,
+ * answering from a knowledge library it cites, with a code workspace, SVG
+ * drawing and a math calculator. Vendored from github.com/Math-halper/mox
+ * into apps/productivity/mox/website/ and framed with ?nosw so the panel's
+ * AI button (Alt+C) and window share the same local page. */
+(() => {
+'use strict';
+
+/* ============================ MOX ============================ */
+const MOX_PAGE = 'apps/productivity/mox/website/index.html?nosw';
+
+registerApp({
+  /* Metadata (name, icon, cat, desc, w, h) lives in the app catalog:
+   * data/applications.js — edit it there, not here. */
+  page: MOX_PAGE,
+  render(body) {
+    body.innerHTML = `${bar('Mox', `<span class="muted">Private AI workspace · <a href="https://github.com/Math-halper/mox" target="_blank" rel="noopener">Math-halper/mox</a></span><button type="button" class="btn sm" data-e="reload">${iconSvg('refresh')} Reload</button><a class="btn sm primary" data-e="ext" href="${MH.esc(MOX_PAGE)}" target="_blank" rel="noopener">${iconSvg('external')} Open in new tab</a>`)}
+    <iframe class="site-frame" src="${MH.esc(MOX_PAGE)}" title="Mox" allowfullscreen style="flex:1;min-height:0;border:0;width:100%;height:100%;background:#0a0a0a"></iframe>`;
+    const ext = body.querySelector('[data-e="ext"]');
+    if (ext) ext.href = MOX_PAGE;
+    body.querySelector('[data-e="reload"]').onclick = () => {
+      const f = body.querySelector('iframe.site-frame');
+      f.src = MOX_PAGE;
+    };
+  },
+});
+})();
+</script>
+</body>
+</html>
